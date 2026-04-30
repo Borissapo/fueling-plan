@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Weekly Fueling Plan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1F3A5F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fuel Plan">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #FAFAF7;
+  --surface: #FFFFFF;
+  --surface-2: #F2F0EA;
+  --border: rgba(0,0,0,0.10);
+  --border-strong: rgba(0,0,0,0.18);
+  --text: #1F1F1D;
+  --text-muted: #6E6E68;
+  --text-faint: #95958E;
+  --accent: #1F3A5F;
+  --accent-hover: #2A4D7A;
+  --info-bg: #E6F1FB;
+  --info-text: #0C447C;
+  --warm-bg: #FAEEDA;
+  --warm-text: #633806;
+  --warm-strong: #412402;
+  --preload-bg: #FFF5DD;
+  --preload-text: #6B4D0A;
+  --preload-strong: #432F00;
+  --rest-bg: #F1EFE8;
+  --rest-text: #444441;
+  --easy-bg: #E6F1FB;
+  --easy-text: #0C447C;
+  --hard-bg: #FAECE7;
+  --hard-text: #712B13;
+  --past-bg: #ECEAE3;
+  --past-text: #6E6E68;
+  --success-bg: #E6F4EA;
+  --success-text: #1F6034;
+  --error-bg: #FBEAEA;
+  --error-text: #851515;
+  --r-md: 8px;
+  --r-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #1A1A1A;
+    --surface: #242424;
+    --surface-2: #2E2E2E;
+    --border: rgba(255,255,255,0.10);
+    --border-strong: rgba(255,255,255,0.18);
+    --text: #E8E8E6;
+    --text-muted: #A0A09A;
+    --text-faint: #6E6E68;
+    --accent: #6B9FD4;
+    --accent-hover: #85B3E0;
+    --info-bg: #1A2E42;
+    --info-text: #7BB8E8;
+    --warm-bg: #3A2A10;
+    --warm-text: #E8C882;
+    --warm-strong: #F0D8A0;
+    --preload-bg: #332A10;
+    --preload-text: #D4B65E;
+    --preload-strong: #E8CC78;
+    --rest-bg: #2A2A28;
+    --rest-text: #B0B0AA;
+    --easy-bg: #1A2E42;
+    --easy-text: #7BB8E8;
+    --hard-bg: #3A1E14;
+    --hard-text: #E89878;
+    --past-bg: #252523;
+    --past-text: #888883;
+    --success-bg: #1A3322;
+    --success-text: #68C080;
+    --error-bg: #3A1818;
+    --error-text: #E88888;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 48px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
+.subtle { color: var(--text-muted); font-size: 13px; }
+.loading-msg { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 16px; }
+.error-msg { text-align: center; padding: 60px 20px; color: var(--error-text); background: var(--error-bg); border-radius: var(--r-lg); margin: 20px; }
+
+/* Metrics */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 16px 0 0; }
+.metric { background: var(--surface-2); border-radius: var(--r-md); padding: 12px 14px; }
+.metric .lbl { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; }
+.metric .val { font-size: 20px; font-weight: 600; line-height: 1.1; margin: 0; }
+.metric .unit { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+
+/* Calibration note */
+.calib { background: var(--surface-2); border-radius: var(--r-md); padding: 12px 14px; margin: 16px 0 0; font-size: 13px; color: var(--text-muted); }
+.calib b { font-weight: 500; color: var(--text); }
+.calib code { background: rgba(128,128,128,0.15); padding: 1px 6px; border-radius: 4px; font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* Changelog */
+.changed { background: var(--success-bg); border-radius: var(--r-md); padding: 12px 14px; margin: 12px 0 0; font-size: 13px; color: var(--success-text); }
+.changed b { font-weight: 600; }
+.changed ul { margin: 6px 0 0; padding-left: 18px; }
+.changed li { margin: 3px 0; }
+
+/* TP refresh */
+.refresh-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r-md); padding: 10px 14px; margin: 16px 0 0; }
+.refresh-btn { appearance: none; background: var(--accent); color: #fff; border: 0; padding: 8px 14px; border-radius: var(--r-md); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.12s, transform 0.05s; }
+.refresh-btn:hover { background: var(--accent-hover); }
+.refresh-btn:active { transform: scale(0.98); }
+.refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.refresh-btn .icon { font-size: 13px; display: inline-block; }
+.refresh-btn.loading .icon { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.refresh-status { font-size: 13px; color: var(--text-muted); flex: 1; min-width: 180px; }
+.refresh-status.success { color: var(--success-text); }
+.refresh-status.error { color: var(--error-text); }
+
+/* Day cards */
+.day { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r-lg); padding: 16px 18px; margin-bottom: 12px; transition: border-color 0.2s; }
+.day.today { border: 2px solid var(--accent); padding: 15px 17px; }
+.day.past { background: var(--past-bg); opacity: 0.85; }
+.day-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.day-name { font-size: 16px; font-weight: 600; }
+.day-date { font-size: 13px; color: var(--text-muted); }
+.pill { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.02em; }
+.pill.today-pill { background: var(--accent); color: #fff; }
+.pill.past-pill { background: var(--past-text); color: #fff; }
+.pill.recal-pill { background: #B95E1F; color: #fff; }
+.pill.actual-pill { background: var(--success-bg); color: var(--success-text); }
+.badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.01em; }
+.badge.rest { background: var(--rest-bg); color: var(--rest-text); }
+.badge.easy { background: var(--easy-bg); color: var(--easy-text); }
+.badge.hard { background: var(--hard-bg); color: var(--hard-text); }
+.session { font-size: 14px; color: var(--text); margin: 0 0 10px; }
+.power-line { font-size: 13px; color: var(--info-text); background: var(--info-bg); padding: 6px 10px; border-radius: var(--r-md); margin: 0 0 10px; font-variant-numeric: tabular-nums; }
+.power-line.actual { background: var(--success-bg); color: var(--success-text); }
+
+/* Macros */
+.macro-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 12px; }
+.macro { background: var(--surface-2); border-radius: var(--r-md); padding: 8px 10px; }
+.macro .m-lbl { font-size: 11px; color: var(--text-muted); margin: 0; }
+.macro .m-val { font-size: 16px; font-weight: 600; margin: 0; line-height: 1.2; }
+.macro .m-unit { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+/* Fuel */
+.fuel { background: var(--warm-bg); border-radius: var(--r-md); padding: 12px 14px; margin: 8px 0 12px; color: var(--warm-text); }
+.fuel-title { font-size: 12px; font-weight: 600; color: var(--warm-strong); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+.fuel-row { font-size: 14px; line-height: 1.55; margin: 4px 0; }
+.fuel-row b { color: var(--warm-strong); font-weight: 500; }
+
+/* Preload */
+.preload { background: var(--preload-bg); border-radius: var(--r-md); padding: 12px 14px; margin: 8px 0 0; color: var(--preload-text); border-left: 3px solid #D4A017; }
+.preload-title { font-size: 12px; font-weight: 600; color: var(--preload-strong); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+.preload ul { margin: 4px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.55; }
+.preload li { margin: 2px 0; }
+.preload b { color: var(--preload-strong); font-weight: 500; }
+
+/* Meals */
+.meals { font-size: 14px; line-height: 1.65; }
+.meals .lead { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 8px 0 4px; font-weight: 500; }
+.meals ul { margin: 0; padding-left: 18px; }
+.meals li { margin: 2px 0; }
+.meals b { font-weight: 500; }
+
+/* Note */
+.note { font-size: 13px; color: var(--text-muted); background: var(--surface-2); border-radius: var(--r-md); padding: 10px 12px; margin: 8px 0 0; }
+.note b { color: var(--text); font-weight: 500; }
+
+/* Footer */
+.foot { margin-top: 24px; font-size: 13px; color: var(--text-muted); border-top: 0.5px solid var(--border); padding-top: 14px; }
+.foot b { color: var(--text); font-weight: 500; }
+.foot ul { margin: 6px 0 0; padding-left: 18px; }
+.foot li { margin: 3px 0; }
+
+/* Install prompt */
+.install-bar { display: none; background: var(--info-bg); color: var(--info-text); border-radius: var(--r-md); padding: 10px 14px; margin: 12px 0 0; font-size: 13px; cursor: pointer; text-align: center; font-weight: 500; }
+.install-bar:hover { opacity: 0.9; }
+
+@media (max-width: 480px) {
+  .macro-row { grid-template-columns: repeat(2, 1fr); }
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+  .wrap { padding: 16px 14px 40px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="loading-msg" id="loading">Loading plan…</div>
+</div>
+
+<script>
+// ─── Config ───
+const PLAN_URL = 'data/plan.json';
+
+// ─── Helpers ───
+function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function formatDate(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function computePowerLine(day, meta) {
+  const p = day.power;
+  if (!p) return null;
+  const baseline = meta.offBikeBaseline;
+
+  if (p.source === 'actual') {
+    const rideKcal = p.rideKcal || Math.round(p.avgWatts * p.durationSec / 1000);
+    const tdee = baseline + rideKcal;
+    const eat = day.macros.kcal;
+    const deficit = tdee - eat;
+    return {
+      html: `TP actual: ${p.avgWatts ? fmt(p.avgWatts) + ' W avg × ' : ''}${fmt(p.durationSec)} s ÷ 1000 = <b>${fmt(rideKcal)} kcal ride</b> · TDEE ${fmt(tdee)} · Eat ${fmt(eat)} (~${fmt(deficit)} kcal deficit)`,
+      isActual: true
+    };
+  }
+
+  if (p.source === 'estimate') {
+    const avgW = Math.round(p.intensityFactor * meta.ftp);
+    const rideKcal = Math.round(avgW * p.durationSec / 1000);
+    const tdee = baseline + rideKcal;
+    const eat = p.targetEat || day.macros.kcal;
+    return {
+      html: `Estimate: ${p.intensityFactor} × ${meta.ftp} W = ${avgW} W × ${fmt(p.durationSec)} s ÷ 1000 = <b>${fmt(rideKcal)} kcal ride</b> · TDEE ${fmt(tdee)} · Eat ${fmt(eat)}`,
+      isActual: false
+    };
+  }
+  return null;
+}
+
+// ─── Render ───
+function renderPlan(plan) {
+  const app = document.getElementById('app');
+  const today = todayISO();
+  const m = plan.meta;
+
+  // Compute weekly hours from session descriptions or sum durations
+  let totalHours = 0;
+  plan.days.forEach(d => {
+    if (d.power && d.power.durationSec) totalHours += d.power.durationSec / 3600;
+  });
+
+  // Compute daily kcal avg
+  let totalKcal = 0;
+  plan.days.forEach(d => totalKcal += d.macros.kcal);
+  const avgKcal = Math.round(totalKcal / plan.days.length);
+
+  let html = `
+    <header>
+      <h1>Weekly fueling plan</h1>
+      <p class="subtle">${m.weekLabel} · ${m.phase} · ${m.version}${m.notes ? ' · ' + m.notes : ''}</p>
+
+      <div class="metrics">
+        <div class="metric"><p class="lbl">FTP</p><p class="val">${m.ftp}<span class="unit"> W</span></p></div>
+        <div class="metric"><p class="lbl">Daily kcal avg</p><p class="val">${fmt(avgKcal)}<span class="unit"> kcal</span></p></div>
+        <div class="metric"><p class="lbl">Protein floor</p><p class="val">${m.proteinFloor}<span class="unit"> g/day</span></p></div>
+        <div class="metric"><p class="lbl">Working weight</p><p class="val">${m.weight}<span class="unit"> kg</span></p></div>
+        <div class="metric"><p class="lbl">Cycling load</p><p class="val">${totalHours.toFixed(1)}<span class="unit"> hr</span></p></div>
+        <div class="metric"><p class="lbl">Off-bike baseline</p><p class="val">${fmt(m.offBikeBaseline)}<span class="unit"> kcal</span></p></div>
+      </div>`;
+
+  // TP refresh bar
+  if (plan.trainingPeaks && plan.trainingPeaks.enabled) {
+    html += `
+      <div class="refresh-bar">
+        <button class="refresh-btn" id="tp-btn" onclick="refreshTP()" type="button"><span class="icon">↻</span> Refresh from TrainingPeaks</button>
+        <span class="refresh-status" id="tp-status">Click to pull latest ride data.</span>
+      </div>`;
+  } else {
+    html += `
+      <div class="refresh-bar">
+        <button class="refresh-btn" disabled type="button"><span class="icon">↻</span> TrainingPeaks API</button>
+        <span class="refresh-status">Not connected — set <code>trainingPeaks.enabled: true</code> in plan.json with your credentials.</span>
+      </div>`;
+  }
+
+  // Calibration
+  html += `
+      <div class="calib">
+        <b>Power-based costing.</b> Each ride is individually costed: <code>ride_kcal ≈ avg_power_W × duration_s ÷ 1000</code>. Completed sessions use TP <em>Energy</em>; planned sessions use estimated avg power = target_IF × FTP (${m.ftp} W). Daily TDEE = ${fmt(m.offBikeBaseline)} + ride_kcal. Adjustable days hit ~${m.deficitPerDay} kcal/day deficit → ~0.25 kg/wk fat loss.
+      </div>`;
+
+  // Changelog
+  if (plan.changelog && plan.changelog.length) {
+    html += `<div class="changed"><b>What changed</b><ul>`;
+    plan.changelog.forEach(c => html += `<li>${c}</li>`);
+    html += `</ul></div>`;
+  }
+
+  // Install prompt
+  html += `<div class="install-bar" id="install-bar" onclick="installPWA()">Install this app on your home screen</div>`;
+
+  html += `</header><h2>Day-by-day</h2>`;
+
+  // Day cards
+  plan.days.forEach(day => {
+    const isPast = day.date < today || day.status === 'done';
+    const isToday = day.date === today;
+    let classes = 'day';
+    if (isPast) classes += ' past';
+    if (isToday) classes += ' today';
+
+    const badgeType = day.type; // rest, easy, hard
+    const badgeLabel = day.sessionLabel || day.type.charAt(0).toUpperCase() + day.type.slice(1);
+
+    html += `<article class="${classes}" data-date="${day.date}">`;
+    html += `<div class="day-head">`;
+    html += `<span class="day-name">${day.name}</span>`;
+    html += `<span class="day-date">${formatDate(day.date)}</span>`;
+    html += `<span class="badge ${badgeType}">${badgeLabel}</span>`;
+    if (isToday) html += `<span class="pill today-pill">TODAY</span>`;
+    if (isPast && !isToday) html += `<span class="pill past-pill">DONE</span>`;
+    if (day.recalibrated) html += `<span class="pill recal-pill">RECALIBRATED</span>`;
+    html += `</div>`;
+
+    html += `<p class="session">${day.session}</p>`;
+
+    // Power line
+    const pl = computePowerLine(day, m);
+    if (pl) {
+      html += `<p class="power-line${pl.isActual ? ' actual' : ''}">${pl.html}</p>`;
+    }
+
+    // Macros
+    const mc = day.macros;
+    html += `<div class="macro-row">`;
+    html += `<div class="macro"><p class="m-lbl">kcal</p><p class="m-val">${fmt(mc.kcal)}</p></div>`;
+    html += `<div class="macro"><p class="m-lbl">Carbs</p><p class="m-val">${fmt(mc.carbs)}<span class="m-unit"> g</span></p></div>`;
+    html += `<div class="macro"><p class="m-lbl">Protein</p><p class="m-val">${fmt(mc.protein)}<span class="m-unit"> g</span></p></div>`;
+    html += `<div class="macro"><p class="m-lbl">Fat</p><p class="m-val">${fmt(mc.fat)}<span class="m-unit"> g</span></p></div>`;
+    html += `</div>`;
+
+    // Note
+    if (day.note) {
+      html += `<div class="note"><b>${day.note.split(':')[0]}:</b>${day.note.split(':').slice(1).join(':')}</div>`;
+    }
+
+    // Fuel
+    if (day.fuel) {
+      html += `<div class="fuel"><p class="fuel-title">${day.fuel.title}</p>`;
+      day.fuel.rows.forEach(r => {
+        html += `<p class="fuel-row"><b>${r.label}:</b> ${r.text}</p>`;
+      });
+      html += `</div>`;
+    }
+
+    // Meals
+    if (day.meals) {
+      html += `<div class="meals"><p class="lead">${day.meals.label}</p><ul>`;
+      day.meals.items.forEach(item => {
+        // Bold the first word/phrase before ':'
+        const colonIdx = item.indexOf(':');
+        if (colonIdx > 0) {
+          html += `<li><b>${item.substring(0, colonIdx)}:</b>${item.substring(colonIdx + 1)}</li>`;
+        } else {
+          html += `<li>${item}</li>`;
+        }
+      });
+      html += `</ul></div>`;
+    }
+
+    // Preload
+    if (day.preload) {
+      html += `<div class="preload"><p class="preload-title">${day.preload.label}</p><ul>`;
+      day.preload.items.forEach(item => {
+        html += `<li>${item}</li>`;
+      });
+      html += `</ul></div>`;
+    }
+
+    html += `</article>`;
+  });
+
+  // Footer
+  if (plan.troubleshooting && plan.troubleshooting.length) {
+    html += `<div class="foot"><p style="margin:0 0 6px"><b>If something feels off this week:</b></p><ul>`;
+    plan.troubleshooting.forEach(t => html += `<li>${t}</li>`);
+    html += `</ul>`;
+    html += `<p style="margin:12px 0 0"><span class="subtle">To update this plan: edit <code>data/plan.json</code> and push to GitHub — Vercel auto-deploys in seconds.</span></p>`;
+    html += `</div>`;
+  }
+
+  app.innerHTML = html;
+
+  // Scroll today into view
+  const todayCard = document.querySelector('.day.today');
+  if (todayCard) {
+    setTimeout(() => todayCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+  }
+}
+
+// ─── Load plan ───
+async function loadPlan() {
+  try {
+    const resp = await fetch(PLAN_URL + '?t=' + Date.now());
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const plan = await resp.json();
+    window._plan = plan;
+    renderPlan(plan);
+  } catch (e) {
+    document.getElementById('app').innerHTML =
+      `<div class="error-msg"><b>Could not load plan.</b><br>${e.message}<br><br>Make sure <code>data/plan.json</code> exists.</div>`;
+  }
+}
+
+// ─── TrainingPeaks API (placeholder) ───
+async function refreshTP() {
+  const btn = document.getElementById('tp-btn');
+  const status = document.getElementById('tp-status');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  status.textContent = 'Connecting to TrainingPeaks…';
+  status.classList.remove('success', 'error');
+
+  try {
+    // When TP API credentials are configured, this will:
+    // 1. Use OAuth to get an access token
+    // 2. Fetch /v1/workouts for the current week
+    // 3. Patch each day card with actual power/energy data
+    //
+    // For now, show a helpful message:
+    const tp = window._plan && window._plan.trainingPeaks;
+    if (!tp || !tp.clientId) {
+      throw new Error('TrainingPeaks API credentials not configured. Add clientId and redirectUri to plan.json.');
+    }
+
+    // --- OAuth flow would go here ---
+    // const token = await getTPToken(tp.clientId, tp.redirectUri);
+    // const workouts = await fetchTPWorkouts(token, startDate, endDate);
+    // patchDayCards(workouts);
+
+    status.textContent = 'TP integration ready — OAuth flow not yet implemented.';
+    status.classList.add('success');
+  } catch (e) {
+    status.textContent = e.message;
+    status.classList.add('error');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+// ─── PWA Install ───
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const bar = document.getElementById('install-bar');
+  if (bar) bar.style.display = 'block';
+});
+
+function installPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(() => {
+    deferredInstallPrompt = null;
+    const bar = document.getElementById('install-bar');
+    if (bar) bar.style.display = 'none';
+  });
+}
+
+// ─── Service Worker ───
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ─── Boot ───
+loadPlan();
+</script>
+</body>
+</html>

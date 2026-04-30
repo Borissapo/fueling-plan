@@ -1,0 +1,240 @@
+{
+  "meta": {
+    "weekLabel": "Mon 27 Apr — Sun 3 May 2026",
+    "phase": "Build week",
+    "version": "Layer 2 v1.1",
+    "notes": "Updated post-FTP test",
+    "ftp": 321,
+    "weight": 81,
+    "proteinFloor": 160,
+    "offBikeBaseline": 2372,
+    "deficitPerDay": 270
+  },
+  "days": [
+    {
+      "date": "2026-04-27",
+      "name": "Monday",
+      "type": "easy",
+      "status": "done",
+      "session": "Easy + Cycling ~1.6 h",
+      "power": {
+        "source": "actual",
+        "avgWatts": 188,
+        "durationSec": 5760,
+        "rideKcal": 975
+      },
+      "macros": { "kcal": 3000, "carbs": 405, "protein": 160, "fat": 80 },
+      "fuel": null,
+      "meals": null,
+      "preload": null
+    },
+    {
+      "date": "2026-04-28",
+      "name": "Tuesday",
+      "type": "hard",
+      "status": "done",
+      "session": "C1 40×20 intervals 1.9 h",
+      "power": {
+        "source": "actual",
+        "avgWatts": 177,
+        "durationSec": 6840,
+        "rideKcal": 1224,
+        "intensityFactor": 0.76
+      },
+      "macros": { "kcal": 4200, "carbs": 700, "protein": 160, "fat": 80 },
+      "fuel": null,
+      "meals": null,
+      "preload": null
+    },
+    {
+      "date": "2026-04-29",
+      "name": "Wednesday",
+      "type": "rest",
+      "status": "done",
+      "session": "OFF — rest day",
+      "power": null,
+      "macros": { "kcal": 2400, "carbs": 245, "protein": 160, "fat": 95 },
+      "fuel": null,
+      "meals": null,
+      "preload": null
+    },
+    {
+      "date": "2026-04-30",
+      "name": "Thursday",
+      "type": "hard",
+      "status": "today",
+      "sessionLabel": "Hard / FTP test",
+      "session": "FTP test 2.0 h (1+12 protocol). FTP confirmed at 321 W.",
+      "recalibrated": true,
+      "power": {
+        "source": "actual",
+        "avgWatts": 157,
+        "durationSec": 7272,
+        "rideKcal": 1176
+      },
+      "macros": { "kcal": 3300, "carbs": 470, "protein": 160, "fat": 75 },
+      "note": "Why lower than a normal hard day: the 1+12 protocol has long warm-up + two short max efforts + rest blocks → ~250 kcal less than a typical hard ride this length. We pull that 250 from intake; protein floor and post-ride feeding stay intact.",
+      "fuel": {
+        "title": "Ride fuel (already done — for the record)",
+        "rows": [
+          { "label": "Pre (3 h out)", "text": "oats 120g + banana + honey + Greek yogurt 200g + coffee → ~160 g C, 25 g P." },
+          { "label": "30–60 min before warm-up", "text": "1 gel + 250 ml carb mix → +40 g C." },
+          { "label": "On bike (~120–130 g)", "text": "bottle at 80 g/L + 1 gel before each test effort. Sodium 800 mg/L." },
+          { "label": "Post (within 30 min — non-negotiable)", "text": "500 ml chocolate milk + scoop whey + banana + dates → ~100 g C, 35 g P. FTP test empties glycogen — refill aggressively even though daily total is lower." }
+        ]
+      },
+      "meals": {
+        "label": "Adjusted sample day · ~3,300 / 470 C / 160 P / 75 F",
+        "items": [
+          "Lunch: rice 200g + chicken 180g + stir-fry veg + soy + 1 tsp sesame oil (~700 kcal).",
+          "Snack (light): skyr 200g + 1 fruit + drizzle of honey (~220 kcal).",
+          "Dinner (smaller): pasta 110g dry + lean beef 130g + tomato sauce + salad + 1 tsp olive oil (~580 kcal)."
+        ]
+      },
+      "preload": {
+        "label": "Tomorrow preload · Fri = 3 h Long Z2",
+        "items": [
+          "Dinner already lands carb-forward and lower-fat — that's the right shape. Don't add fat or fiber late.",
+          "If hungry before bed: extra honey on the skyr, banana, or a slice of toast. Carbs > protein at this point.",
+          "Hydrate to colourless urine before bed. Pinch of salt at dinner if sodium felt low."
+        ]
+      }
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Friday",
+      "type": "hard",
+      "status": "upcoming",
+      "sessionLabel": "Long",
+      "session": "Long Z2 3.0 h.",
+      "power": {
+        "source": "estimate",
+        "intensityFactor": 0.72,
+        "durationSec": 10800,
+        "targetEat": 4600
+      },
+      "macros": { "kcal": 4600, "carbs": 770, "protein": 160, "fat": 90 },
+      "fuel": {
+        "title": "Ride fuel",
+        "rows": [
+          { "label": "Pre (2–3 h out)", "text": "oats 100g + banana + honey + Greek yogurt 200g + 2 eggs → ~145 g C, 30 g P." },
+          { "label": "On bike (~195 g, 70–90 g/hr)", "text": "2 bottles mix at 60 g/L (= 120 g) + 2 gels (50 g) + 1 banana (25 g). Sodium 700 mg/L. Drink ~750 ml/hr. Start eating from min 30." },
+          { "label": "Post (30–60 min)", "text": "500 ml chocolate milk + scoop whey + banana + dried fruit → ~100 g C, 30 g P." }
+        ]
+      },
+      "meals": {
+        "label": "Sample day · ~4,600 / 770 C / 160 P / 90 F",
+        "items": [
+          "Lunch: burrito bowl — rice 280g + chicken/beef 180g + black beans 100g + corn 50g + avocado 60g + salsa.",
+          "Snack: 2 rice cakes + 25g peanut butter + 1 fruit + 200g skyr + drizzle of honey.",
+          "Dinner: salmon 180g + sweet potato 320g + roasted broccoli + 1 tbsp olive oil.",
+          "Evening: Greek yogurt 200g + honey + granola 30g + banana."
+        ]
+      },
+      "preload": {
+        "label": "Tomorrow preload · Sat = 4 h Long Z2 (the big one)",
+        "items": [
+          "Most important preload of the week. Snack and dinner above are already loaded — keep them that way. Don't substitute heavy fat (creamy pasta, fried food) or high fiber (lentil/bean bowl) for dinner.",
+          "If craving 2nd dinner / late snack: white rice + a little honey, or sourdough + jam, or banana + cereal. Aim for an extra 60–80 g carb if appetite allows.",
+          "Salt the dinner generously — Saturday is hot/long, want sodium status high before you start.",
+          "Lights out early. Set bottles + bars + breakfast prep before bed."
+        ]
+      }
+    },
+    {
+      "date": "2026-05-02",
+      "name": "Saturday",
+      "type": "hard",
+      "status": "upcoming",
+      "sessionLabel": "Long — the big one",
+      "session": "Long Z2 4.0 h. Most important fueling day of the week.",
+      "power": {
+        "source": "estimate",
+        "intensityFactor": 0.72,
+        "durationSec": 14400,
+        "targetEat": 5400
+      },
+      "macros": { "kcal": 5400, "carbs": 920, "protein": 165, "fat": 95 },
+      "fuel": {
+        "title": "Ride fuel",
+        "rows": [
+          { "label": "Pre (2–3 h out)", "text": "oats 100g + 2 bananas + honey 30g + Greek yogurt 200g + 2 eggs → ~165 g C, 35 g P." },
+          { "label": "30 min before", "text": "1 gel + 250 ml carb mix → +40 g C." },
+          { "label": "On bike (~340 g, 80–100 g/hr)", "text": "2 bottles mix at 80 g/L (= 160 g) + 4 jam-stuffed rice cakes (~100 g) + 2 gels (50 g) + 1 banana (25 g). Sodium 800 mg/L. Drink ≥750 ml/hr. Eat every 25–30 min — stay ahead." },
+          { "label": "Post (within 30 min)", "text": "500 ml chocolate milk + scoop whey + banana + 50 g dried fruit → ~110 g C, 30 g P. Real meal within 90 min." }
+        ]
+      },
+      "meals": {
+        "label": "Sample day · ~5,400 / 920 C / 165 P / 95 F",
+        "items": [
+          "Lunch (real meal): pasta 220g dry + lean beef 180g + tomato sauce + parmesan 25g + salad.",
+          "Snack: 2 slices sourdough + honey + cottage cheese 150g + 1 fruit + 30g almonds.",
+          "Dinner: rice 280g + chicken thigh 180g + stir-fry veg + soy + 1 tsp sesame oil.",
+          "Evening: skyr 200g + honey + granola 40g + berries."
+        ]
+      },
+      "preload": {
+        "label": "Tomorrow preload · Sun = 3 h Long Z2",
+        "items": [
+          "After 4-hour ride, glycogen will still be partly depleted into Sunday. Recovery shake + lunch + afternoon snack do the heavy lifting — don't skip even if appetite suppressed (very common after long rides).",
+          "If you can't face solid food right after: liquid first (chocolate milk, smoothie), real food in 90 min.",
+          "Dinner should still hit carbs — Sunday's ride pulls from today's stores."
+        ]
+      }
+    },
+    {
+      "date": "2026-05-03",
+      "name": "Sunday",
+      "type": "hard",
+      "status": "upcoming",
+      "sessionLabel": "Long",
+      "session": "Long Z2 3.0 h. Legs heavy after Sat — expected.",
+      "power": {
+        "source": "estimate",
+        "intensityFactor": 0.72,
+        "durationSec": 10800,
+        "targetEat": 4600
+      },
+      "macros": { "kcal": 4600, "carbs": 770, "protein": 160, "fat": 90 },
+      "fuel": {
+        "title": "Ride fuel",
+        "rows": [
+          { "label": "Pre", "text": "same as Friday — oats + banana + honey + Greek yogurt + eggs → ~145 g C, 30 g P." },
+          { "label": "On bike (~195 g, 70 g/hr)", "text": "2 bottles mix at 60 g/L + 2 gels + 1 banana. Sodium 700 mg/L." },
+          { "label": "Post", "text": "chocolate milk + scoop whey + banana + dates within 30–60 min." }
+        ]
+      },
+      "meals": {
+        "label": "Sample day · same template as Friday",
+        "items": [
+          "Swap rice for potatoes/quinoa if you're sick of it. Macros unchanged.",
+          "Sunday review: weigh-in fasted, post-bathroom. Note hunger, sleep, ride feel."
+        ]
+      },
+      "preload": {
+        "label": "Tomorrow preload · Mon = recovery / next block",
+        "items": [
+          "After a 17.5-hour week, safe assumption is Monday is recovery or moderate. Eat normally to bedtime; let appetite drop on Monday if it wants to.",
+          "Sunday review (footer below) — log the week before going to sleep."
+        ]
+      }
+    }
+  ],
+  "changelog": [
+    "Today (FTP test): 4,200 → 3,300 kcal. Actual TP energy was 1,176 kcal (582 kcal/hr) — the 1+12 protocol has long warm-up + rest blocks, much lower than a standard hard ride.",
+    "Fri/Sat/Sun: 4,400 / 5,000 / 4,400 → 4,600 / 5,400 / 4,600. New FTP (321 W) means estimated Z2 avg power is ~231 W vs the implicit ~200 W in the old 706 kcal/hr blanket.",
+    "Added Tomorrow preload notes — what to do with today's last meals to set up tomorrow's session."
+  ],
+  "troubleshooting": [
+    "Dragging by Friday → power estimates too conservative; add 200 kcal/day, mostly carb on ride days.",
+    "Weight stalls or trends up over 2 weeks → pull rest-day carbs by 50 g, hold ride days.",
+    "Tracking starts to weigh on mood → drop tracking; protein and ride fueling only.",
+    "Sick → pause the deficit, eat at maintenance, prioritize protein and fluids."
+  ],
+  "trainingPeaks": {
+    "enabled": false,
+    "clientId": "",
+    "redirectUri": "",
+    "comment": "Set enabled:true and fill in clientId + redirectUri once you have TP API credentials. See README for setup."
+  }
+}
