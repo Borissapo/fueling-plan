@@ -266,20 +266,12 @@ function renderPlan(plan) {
         <div class="metric"><p class="lbl">Off-bike baseline</p><p class="val">${fmt(m.offBikeBaseline)}<span class="unit"> kcal</span></p></div>
       </div>`;
 
-  // TP refresh bar
-  if (plan.trainingPeaks && plan.trainingPeaks.enabled) {
-    html += `
-      <div class="refresh-bar">
-        <button class="refresh-btn" id="tp-btn" onclick="refreshTP()" type="button"><span class="icon">↻</span> Refresh from TrainingPeaks</button>
-        <span class="refresh-status" id="tp-status">Click to pull latest ride data.</span>
-      </div>`;
-  } else {
-    html += `
-      <div class="refresh-bar">
-        <button class="refresh-btn" disabled type="button"><span class="icon">↻</span> TrainingPeaks API</button>
-        <span class="refresh-status">Not connected — set <code>trainingPeaks.enabled: true</code> in plan.json with your credentials.</span>
-      </div>`;
-  }
+  // Intervals.icu refresh bar
+  html += `
+    <div class="refresh-bar">
+      <button class="refresh-btn" id="icu-btn" onclick="refreshFromIntervals()" type="button"><span class="icon">↻</span> Refresh from Intervals.icu</button>
+      <span class="refresh-status" id="icu-status">Click to pull latest ride data from Intervals.icu.</span>
+    </div>`;
 
   // Calibration
   html += `
@@ -383,7 +375,7 @@ function renderPlan(plan) {
     html += `<div class="foot"><p style="margin:0 0 6px"><b>If something feels off this week:</b></p><ul>`;
     plan.troubleshooting.forEach(t => html += `<li>${t}</li>`);
     html += `</ul>`;
-    html += `<p style="margin:12px 0 0"><span class="subtle">To update this plan: edit <code>data/plan.json</code> and push to GitHub — Vercel auto-deploys in seconds.</span></p>`;
+    html += `<p style="margin:12px 0 0"><span class="subtle">To update this plan: edit <code>data/plan.json</code> and push to GitHub — Vercel auto-deploys in seconds. Ride data refreshes from Intervals.icu.</span></p>`;
     html += `</div>`;
   }
 
@@ -410,35 +402,77 @@ async function loadPlan() {
   }
 }
 
-// ─── TrainingPeaks API (placeholder) ───
-async function refreshTP() {
-  const btn = document.getElementById('tp-btn');
-  const status = document.getElementById('tp-status');
+// ─── Intervals.icu Integration ───
+async function refreshFromIntervals() {
+  const btn = document.getElementById('icu-btn');
+  const status = document.getElementById('icu-status');
   if (!btn) return;
   btn.disabled = true;
   btn.classList.add('loading');
-  status.textContent = 'Connecting to TrainingPeaks…';
+  status.textContent = 'Fetching rides from Intervals.icu…';
   status.classList.remove('success', 'error');
 
   try {
-    // When TP API credentials are configured, this will:
-    // 1. Use OAuth to get an access token
-    // 2. Fetch /v1/workouts for the current week
-    // 3. Patch each day card with actual power/energy data
-    //
-    // For now, show a helpful message:
-    const tp = window._plan && window._plan.trainingPeaks;
-    if (!tp || !tp.clientId) {
-      throw new Error('TrainingPeaks API credentials not configured. Add clientId and redirectUri to plan.json.');
+    const plan = window._plan;
+    if (!plan || !plan.days || !plan.days.length) throw new Error('No plan loaded.');
+
+    // Get date range from plan
+    const dates = plan.days.map(d => d.date).sort();
+    const oldest = dates[0];
+    const newest = dates[dates.length - 1];
+
+    // Call our serverless proxy
+    const resp = await fetch(`/api/intervals?oldest=${oldest}&newest=${newest}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
     }
+    const byDate = await resp.json();
 
-    // --- OAuth flow would go here ---
-    // const token = await getTPToken(tp.clientId, tp.redirectUri);
-    // const workouts = await fetchTPWorkouts(token, startDate, endDate);
-    // patchDayCards(workouts);
+    // Patch each day card with actual data
+    let updated = 0;
+    const baseline = plan.meta.offBikeBaseline;
 
-    status.textContent = 'TP integration ready — OAuth flow not yet implemented.';
-    status.classList.add('success');
+    document.querySelectorAll('.day[data-date]').forEach(card => {
+      const date = card.dataset.date;
+      const data = byDate[date];
+      if (!data || !data.totalEnergy) return;
+
+      // Update power line
+      const pl = card.querySelector('.power-line');
+      if (pl) {
+        const ride = data.totalEnergy;
+        const tdee = baseline + ride;
+        const dayData = plan.days.find(d => d.date === date);
+        const eat = dayData ? dayData.macros.kcal : null;
+        let line = `Intervals.icu: ${data.avgWatts ? fmt(data.avgWatts) + ' W avg × ' : ''}${fmt(data.totalTime)} s ÷ 1000 = <b>${fmt(ride)} kcal ride</b> · TDEE ${fmt(tdee)}`;
+        if (eat) line += ` · Eat ${fmt(eat)} (~${fmt(tdee - eat)} kcal deficit)`;
+        pl.innerHTML = line;
+        pl.classList.add('actual');
+      }
+
+      // Add actual pill if not present
+      const head = card.querySelector('.day-head');
+      if (head && !card.querySelector('.actual-pill')) {
+        const pill = document.createElement('span');
+        pill.className = 'pill actual-pill';
+        pill.textContent = '✓ actual';
+        head.appendChild(pill);
+      }
+      card.classList.add('refreshed');
+      updated++;
+    });
+
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    if (updated > 0) {
+      status.textContent = `Updated ${hh}:${mm} · ${updated} day${updated === 1 ? '' : 's'} patched from Intervals.icu.`;
+      status.classList.add('success');
+    } else {
+      status.textContent = `Refreshed ${hh}:${mm} · no matching rides found for this week.`;
+      status.classList.add('success');
+    }
   } catch (e) {
     status.textContent = e.message;
     status.classList.add('error');

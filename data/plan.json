@@ -231,10 +231,7 @@
     "Tracking starts to weigh on mood → drop tracking; protein and ride fueling only.",
     "Sick → pause the deficit, eat at maintenance, prioritize protein and fluids."
   ],
-  "trainingPeaks": {
-    "enabled": false,
-    "clientId": "",
-    "redirectUri": "",
-    "comment": "Set enabled:true and fill in clientId + redirectUri once you have TP API credentials. See README for setup."
+  "intervalsICU": {
+    "comment": "API key and athlete ID are stored as Vercel environment variables (not here — never commit secrets). See README for setup."
   }
 }
