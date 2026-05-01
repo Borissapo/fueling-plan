@@ -276,7 +276,7 @@ function getOffBikeBaseline(s) {
 // ════════════════════════════════════════════════════════════════
 function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 function formatDate(d) {
   const dt = new Date(d + 'T00:00:00');
@@ -380,6 +380,57 @@ function classifySession(events) {
 
   const session = name || `${label} ${hours.toFixed(1)} h`;
 
+  return { type, label, session, durationSec: totalDur, intensityFactor };
+}
+
+// Classify from completed activity data (when events may no longer exist)
+function classifyFromActivity(acts, settings) {
+  const totalDur = acts.totalTime || 0;
+  const hours = totalDur / 3600;
+  const rides = acts.rides || [];
+  const name = rides.map(r => r.name).join(' + ');
+  const nameLower = name.toLowerCase();
+
+  // Get IF from actual data
+  let intensityFactor = null;
+  for (const r of rides) {
+    if (r.icu_intensity) { intensityFactor = r.icu_intensity; break; }
+  }
+  // Estimate IF from avg power if not available
+  if (!intensityFactor && acts.avgWatts && settings.ftp) {
+    intensityFactor = (acts.avgWatts * (settings.variabilityIndex || 1.18)) / settings.ftp;
+  }
+
+  let type, label;
+
+  if (hours >= 2.5) {
+    type = 'long';
+    label = hours >= 3.5 ? 'Long — big day' : 'Long';
+  } else if (hours >= 1.5 && (nameLower.includes('z2') || nameLower.includes('endurance') || nameLower.includes('long'))) {
+    type = 'long';
+    label = 'Long';
+  } else if (nameLower.includes('interval') || nameLower.includes('threshold') || nameLower.includes('vo2')
+          || nameLower.includes('ftp') || nameLower.includes('race') || nameLower.includes('tempo')
+          || nameLower.includes('sweet spot') || nameLower.includes('ss ')
+          || (intensityFactor && intensityFactor > 0.82)) {
+    type = 'hard';
+    label = 'Hard';
+  } else if (hours <= 1.0 || nameLower.includes('recovery') || nameLower.includes('easy')
+          || (intensityFactor && intensityFactor < 0.60)) {
+    type = 'easy';
+    label = 'Easy';
+  } else {
+    type = 'hard';
+    label = nameLower.includes('z2') ? 'Endurance' : 'Moderate';
+  }
+
+  if (!intensityFactor) {
+    if (type === 'easy') intensityFactor = 0.55;
+    else if (type === 'long') intensityFactor = 0.65;
+    else intensityFactor = 0.78;
+  }
+
+  const session = name || `${label} ${hours.toFixed(1)} h`;
   return { type, label, session, durationSec: totalDur, intensityFactor };
 }
 
@@ -493,7 +544,6 @@ function generatePreFuel(durationSec, weight, intensityFactor) {
 
   return { carbs, protein, fat, timing, carbGkg: carbGkg.toFixed(1), trainLow: false, why };
 }
-
 // ────────────────────────────────────────────────────────────────
 //  2D FUELING MATRIX — Duration × Intensity (Jeukendrup 2014 +
 //  Hawley & Leckey 2015 substrate-dependence + Stellingwerff/
@@ -698,7 +748,9 @@ let cachedData = {};
 async function fetchWeekData(monday) {
   const sunday = addDays(monday, 6);
   const key = monday;
-  if (cachedData[key]) return cachedData[key];
+  const thisMonday = getMonday(todayISO());
+  // Don't cache current week — activities get completed throughout the day
+  if (cachedData[key] && key !== thisMonday) return cachedData[key];
   const resp = await fetch(`/api/intervals?oldest=${monday}&newest=${sunday}`);
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
@@ -755,7 +807,11 @@ function renderPlan(data) {
     const evts = data.events ? data.events[date] : null;
     const acts = data.activities ? data.activities[date] : null;
     const hasActual = acts && acts.totalEnergy > 0;
-    const classified = classifySession(evts ? evts : []);
+    // If we have actual ride data, classify from that (events may be removed post-completion)
+    // Otherwise fall back to planned events
+    const classified = hasActual
+      ? classifyFromActivity(acts, settings)
+      : classifySession(evts ? evts : []);
 
     let rideKcal, avgWatts, durationSec, source;
     if (hasActual) {
