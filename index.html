@@ -400,7 +400,21 @@ function computeDayMacros(rideKcal, durationSec, settings) {
   // Recalculate actual intake from rounded values
   const actualIntake = Math.round(carbs * 4 + protein * 4 + fat * 9);
 
-  return { kcal: actualIntake, carbs, protein, fat, tdee, intake: Math.round(intake) };
+  // Generate explanatory note for this day's macros
+  const carbGkg = (carbs / settings.weight).toFixed(1);
+  const protGkg = (protein / settings.weight).toFixed(1);
+  const fatPctActual = Math.round(fat * 9 / actualIntake * 100);
+
+  let macroWhy = `<b>Carbs ${carbGkg} g/kg:</b> Burke 2011 table — `;
+  if (hours === 0) macroWhy += `rest/light day → 3–5 g/kg/d.`;
+  else if (hours < 1.5) macroWhy += `moderate (~1h) → 5–7 g/kg/d.`;
+  else if (hours < 3) macroWhy += `high (1–3h, mod intensity) → 6–10 g/kg/d.`;
+  else macroWhy += `very high (&gt;3h) → 8–12 g/kg/d.`;
+  macroWhy += ` Carbs are the adjustment lever in periodised nutrition (Stellingwerff/Burke "fuel for the work required").`;
+  macroWhy += ` | <b>Protein ${protGkg} g/kg:</b> Phillips & van Loon 2011: 1.2–2.0 g/kg/d for athletes; upper end during deficit to preserve lean mass. Fixed at ${protein}g/day floor.`;
+  macroWhy += ` | <b>Fat ${fatPctActual}%:</b> Thomas 2016 ACSM: minimum 20% of energy for hormonal health. Set to ~${Math.round(fatPct * 100)}% — not a performance lever, kept stable.`;
+
+  return { kcal: actualIntake, carbs, protein, fat, tdee, intake: Math.round(intake), macroWhy };
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -410,105 +424,102 @@ function computeDayMacros(rideKcal, durationSec, settings) {
 
 function generatePreFuel(durationSec, weight) {
   const hours = durationSec / 3600;
-  if (hours < 0.75) return null; // No pre-fuel needed for very short sessions
+  if (hours < 0.75) return null;
 
-  let carbGkg, timing;
-  if (hours < 1.5) {
-    carbGkg = 1.0; timing = '1–2 h before';
-  } else if (hours < 2.5) {
-    carbGkg = 1.5; timing = '2–3 h before';
-  } else if (hours < 3.5) {
-    carbGkg = 2.0; timing = '2–3 h before';
-  } else {
-    carbGkg = 2.5; timing = '2–3 h before';
-  }
+  let carbGkg;
+  if (hours < 1.5) carbGkg = 0.5;
+  else if (hours < 2.5) carbGkg = 0.8;
+  else if (hours < 3.5) carbGkg = 1.0;
+  else carbGkg = 1.2;
 
   const carbs = Math.round(carbGkg * weight);
-  const protein = Math.round(0.3 * weight); // 0.3 g/kg per Phillips & van Loon
-  const fat = hours >= 2 ? 10 : 5; // minimal fat, low fiber
+  const protein = 5;
+  const fat = 0;
 
-  return {
-    carbs, protein, fat,
-    timing,
-    notes: hours >= 2
-      ? 'Low fat, low fibre, moderate protein. E.g. oats + banana + honey + Greek yogurt + eggs.'
-      : 'Light, carb-focused. E.g. toast + honey + banana, or oats + fruit.',
-    carbGkg: carbGkg.toFixed(1)
-  };
+  const why = [
+    `<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g):</b> Thomas 2016 ACSM recommends 1–4 g/kg 1–4h pre-exercise. At 30 min, dose is scaled to ${carbGkg.toFixed(1)} g/kg to allow gastric emptying before effort. Focus on quick-digesting CHO (glucose, sucrose, maltodextrin) — avoid fructose-only sources which empty slower (Jeukendrup & Gleeson, Sport Nutrition Ch. 8).`,
+    `<b>Protein ~5g, fat 0g:</b> Both slow gastric emptying. At 30 min pre, keep minimal to reduce GI distress risk (Burke et al. 2011: pre-event meal should be "low fat, low fibre, moderate protein" — but at 30 min the window is too short for significant protein).`,
+    `<b>Examples:</b> 1–2 gels, banana + honey, white bread + jam, rice cake + honey, dates. Avoid: oats, eggs, yogurt, anything with fat or fibre.`,
+  ];
+
+  return { carbs, protein, fat, timing: '30 min before', carbGkg: carbGkg.toFixed(1), why };
 }
 
 function generateIntraFuel(durationSec, weight) {
   const hours = durationSec / 3600;
 
   if (hours < 0.75) {
-    return { rate: 0, total: 0, type: 'none', detail: 'No fueling needed — glycogen sufficient.', sodium: 0, fluid: 0 };
+    return {
+      rate: 0, total: 0, sodium: 0, fluid: 0,
+      why: [`<b>No fueling needed.</b> Muscle glycogen stores (~400–500g when full) are sufficient for efforts under 45 min (Burke et al. 2011; Jeukendrup 2014 decision tree: events &lt;30 min → no CHO).`]
+    };
   }
   if (hours < 1.25) {
-    return { rate: 0, total: 0, type: 'mouth-rinse', detail: 'Mouth rinse only (4–6% CHO solution, swirl 5–10 s). Central ergogenic effect without GI load.', sodium: 0, fluid: '400–600' };
+    return {
+      rate: 0, total: 0, sodium: 0, fluid: '400–600 ml/h',
+      why: [
+        `<b>Mouth rinse only.</b> Jeukendrup 2014 & Burke 2011: for 30–75 min sustained efforts, swirling a 4–6% CHO solution in the mouth for 5–10 sec improves performance ~2–3% via central/oropharyngeal pathways (Chambers et al. fMRI studies showed brain reward-centre activation). No need to swallow — substrate isn't the limiter at this duration.`,
+        `<b>Fluid:</b> Sawka 2007 ACSM: 400–800 ml/h depending on sweat rate and conditions. Drink to thirst for short efforts.`
+      ]
+    };
   }
 
-  let rate, choType, sodium, fluid;
+  let rate, sodium, fluid;
+  const why = [];
 
   if (hours < 2) {
-    rate = 30;
-    choType = 'Single-source CHO OK (glucose, maltodextrin, sucrose).';
-    sodium = '300–500';
-    fluid = '400–750';
+    rate = 30; sodium = '300–500'; fluid = '400–750';
+    why.push(`<b>CHO rate: 30 g/h.</b> Burke et al. 2011 duration ladder: 1–2h events → 30–60 g/h. At the shorter end, 30 g/h is sufficient. Single-source CHO OK (glucose, maltodextrin, sucrose) — SGLT1 transporter handles up to ~60 g/h before saturation (Jeukendrup 2014).`);
   } else if (hours < 2.5) {
-    rate = 60;
-    choType = 'Single-source CHO OK. Consider multi-transportable if gut tolerates.';
-    sodium = '500–700';
-    fluid = '500–750';
+    rate = 60; sodium = '500–700'; fluid = '500–750';
+    why.push(`<b>CHO rate: 60 g/h.</b> Burke et al. 2011: 2–3h events → up to 60 g/h. This is the practical ceiling for single-source CHO — the intestinal SGLT1 glucose transporter saturates at ~1.0–1.1 g/min (Jeukendrup 2014). Above 60 g/h with single-source, unabsorbed CHO draws water into the gut lumen → GI distress. Consider multi-transportable (2:1 glu:fru) if gut tolerates it.`);
   } else if (hours < 3.5) {
-    rate = 80;
-    choType = 'Multi-transportable CHO required (2:1 glu:fru). Single-source saturates SGLT1 at ~60 g/h.';
-    sodium = '500–700';
-    fluid = '600–800';
+    rate = 80; sodium = '500–700'; fluid = '600–800';
+    why.push(`<b>CHO rate: 80 g/h.</b> Jeukendrup 2014 decision tree: events &gt;2.5h → 60–90 g/h with multi-transportable CHO required. Fructose is absorbed via the GLUT5 transporter (independent of SGLT1), raising total absorption capacity to ~1.5–1.75 g/min. Use 2:1 glucose:fructose ratio. Cermak & van Loon 2013 meta-analysis: CHO during exercise improves TT performance ~2%.`);
   } else {
-    rate = 90;
-    choType = 'Multi-transportable CHO required (2:1 glu:fru). Gut-trained athletes: push toward 100–120 g/h.';
-    sodium = '600–800';
-    fluid = '≥750';
+    rate = 90; sodium = '600–800'; fluid = '≥750';
+    why.push(`<b>CHO rate: 90 g/h (push to 100–120 if gut-trained).</b> Jeukendrup 2014: gut-trained athletes can achieve absorption rates of 1.75 g/min (105 g/h) vs untrained ~1.1 g/min. Gut training is a 4–6 week protocol of progressively higher CHO on long rides — it upregulates SGLT1/GLUT5 transporters and speeds gastric emptying. Multi-transportable CHO required (2:1 glu:fru).`);
   }
 
-  // Effective fueling time: start from min 20-30, end ~15 min before finish
+  why.push(`<b>Sodium: ${sodium} mg/L.</b> Sawka 2007 ACSM position stand: 300–700 mg/L for events &gt;2h. Replaces sweat sodium losses (typical sweat [Na+] = 20–80 mmol/L). Prevents exercise-associated hyponatraemia (EAH) and aids fluid absorption.`);
+  why.push(`<b>Fluid: ${fluid} ml/h.</b> Sawka 2007: target ≤2% body mass loss. Typical range 400–800 ml/h; higher in heat. Gastric emptying tops out at ~1.0–1.2 L/h.`);
+  why.push(`<b>Timing:</b> Start eating from min 20–30. Eat every 20–30 min to maintain steady exogenous CHO oxidation. Don't wait until you feel depleted — by then glycogen is already compromised (Hawley & Leckey 2015).`);
+
   const fuelingHours = Math.max(0, hours - 0.5);
   const total = Math.round(rate * fuelingHours);
 
-  return {
-    rate, total, type: choType,
-    detail: `Start fueling from min 20–30. Eat every 20–30 min — stay ahead.`,
-    sodium: `${sodium} mg/L`,
-    fluid: `${fluid} ml/h`
-  };
+  return { rate, total, sodium: `${sodium} mg/L`, fluid: `${fluid} ml/h`, why };
 }
 
 function generatePostFuel(durationSec, weight, intensityFactor) {
   const hours = durationSec / 3600;
   if (hours < 0.75) return null;
 
-  const protein = Math.round(0.3 * weight); // 0.3 g/kg per Phillips & van Loon
+  const proteinGkg = 0.3;
+  const protein = Math.round(proteinGkg * weight);
   let carbGkg;
   if (hours < 1.5) carbGkg = 0.8;
   else if (hours < 2.5) carbGkg = 1.0;
   else carbGkg = 1.2;
 
-  // Higher IF = more glycogen depletion = more aggressive refuel
   if (intensityFactor > 0.80) carbGkg = Math.min(1.2, carbGkg + 0.1);
 
   const carbs = Math.round(carbGkg * weight);
 
-  return {
-    carbs, protein,
-    timing: 'Within 30–60 min',
-    carbGkg: carbGkg.toFixed(1),
-    notes: hours >= 2.5
-      ? 'Glycogen heavily depleted. Refuel aggressively even if appetite is suppressed. Liquid first if needed (chocolate milk, smoothie), real meal within 90 min.'
-      : 'Recovery shake or meal. E.g. chocolate milk + whey + banana + dried fruit.',
-  };
+  const why = [
+    `<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g):</b> Burke et al. 2011 recovery protocol: 1.0–1.2 g/kg/h for the first 4h when next session is &lt;8h away. ${hours >= 2.5 ? 'After ' + hours.toFixed(1) + 'h, glycogen is heavily depleted — the recovery window matters most here.' : 'Even with a longer turnaround, early refueling accelerates glycogen resynthesis.'} Glycogen synthase is most active immediately post-exercise (Ivy et al. 1988).`,
+    `<b>Protein ${proteinGkg} g/kg (${protein}g):</b> Phillips & van Loon 2011: 0.3 g/kg per meal maximally stimulates muscle protein synthesis (MPS) via the leucine/mTORC1 pathway. Each dose needs ~2.5–3g leucine — achievable from 25–30g whey or 35–50g plant protein. Co-ingesting protein with CHO also modestly improves glycogen resynthesis when CHO is sub-optimal (Burke 2011).`,
+    `<b>Timing: within 30–60 min.</b> Thomas 2016 ACSM: post-exercise protein + CHO within the first hour. MPS response is elevated for ~24h post-exercise, but the immediate window is when glycogen synthase activity peaks and the muscle is most insulin-sensitive.`,
+  ];
+
+  if (hours >= 2.5) {
+    why.push(`<b>Appetite note:</b> Prolonged exercise often suppresses appetite (exercise-induced anorexia). If you can't face solid food, start with liquid: chocolate milk, smoothie, or recovery shake. Follow with a real meal within 90 min. Don't skip — tomorrow's session pulls from today's recovery.`);
+  }
+  why.push(`<b>Examples:</b> 500ml chocolate milk + scoop whey + banana + dried fruit. Or recovery shake + rice cake + honey.`);
+
+  return { carbs, protein, timing: 'Within 30–60 min', carbGkg: carbGkg.toFixed(1), why };
 }
 
-// Preload advice for tomorrow
 function generatePreload(tomorrowClassified, dayOfWeek) {
   if (!tomorrowClassified || tomorrowClassified.type === 'rest') return null;
 
@@ -516,15 +527,17 @@ function generatePreload(tomorrowClassified, dayOfWeek) {
   const items = [];
 
   if (tomorrowClassified.type === 'long' || hours >= 2.5) {
-    items.push('Dinner should be carb-forward, low fibre, moderate protein, low fat. No creamy pasta, fried food, or high-fibre legume bowls.');
+    items.push('<b>Why preload:</b> Glycogen replenishment takes 24–48h (Burke 2011). Tonight\'s dinner partly fuels tomorrow\'s ride — the "fuel for the work required" model (Stellingwerff/Burke/Impey 2018).');
+    items.push('Dinner should be carb-forward, low fibre, moderate protein, low fat. Thomas 2016 ACSM: pre-event meal = low fat, low fibre, familiar foods. No creamy pasta, fried food, or high-fibre legume bowls.');
     if (hours >= 3.5) {
-      items.push('If craving 2nd dinner / late snack: white rice + honey, sourdough + jam, or banana + cereal. Aim for an extra 60–80 g carb.');
+      items.push('If craving 2nd dinner / late snack: white rice + honey, sourdough + jam, or banana + cereal. Aim for an extra 60–80 g carb. Burke 2011: 24–36h at 10–12 g/kg/d maximises glycogen for events &gt;90 min.');
     }
-    items.push('Salt dinner generously if tomorrow is long or hot — want sodium status high before you start.');
+    items.push('Salt dinner generously if tomorrow is long or hot — Sawka 2007: pre-exercise sodium loading improves fluid retention and reduces hyponatraemia risk.');
     items.push('Prep bottles + bars + breakfast before bed. Lights out early.');
   } else if (tomorrowClassified.type === 'hard') {
+    items.push('<b>Why preload:</b> Burke 2011 periodised model — high-intensity sessions need high CHO availability to be productive. Glycogen-depleted threshold work = junk training.');
     items.push('Dinner carb-forward to top up glycogen. Don\'t add extra fat or fibre late.');
-    items.push('If hungry before bed: carbs > protein at this point (honey, toast, banana).');
+    items.push('If hungry before bed: carbs > protein at this point (honey, toast, banana). Van Loon: pre-sleep casein (30–40g) supports overnight MPS if you want protein too.');
   } else {
     items.push('Normal dinner. Hydrate to pale urine before bed.');
   }
@@ -542,9 +555,7 @@ let cachedData = {};
 async function fetchWeekData(monday) {
   const sunday = addDays(monday, 6);
   const key = monday;
-
   if (cachedData[key]) return cachedData[key];
-
   const resp = await fetch(`/api/intervals?oldest=${monday}&newest=${sunday}`);
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
@@ -558,42 +569,33 @@ async function fetchWeekData(monday) {
 // ════════════════════════════════════════════════════════════════
 //  RENDER
 // ════════════════════════════════════════════════════════════════
-
-let activeView = 'plan'; // 'plan' or 'settings'
+let activeView = 'plan';
 
 function renderApp() {
-  if (activeView === 'settings') {
-    renderSettings();
-  } else {
-    loadAndRenderPlan();
-  }
+  if (activeView === 'settings') renderSettings();
+  else loadAndRenderPlan();
 }
 
 async function loadAndRenderPlan() {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading-msg">Loading from Intervals.icu…</div>';
-
   try {
     const data = await fetchWeekData(currentMonday);
     renderPlan(data);
   } catch (e) {
-    app.innerHTML = `
-      ${renderHeader()}
-      <div class="error-msg"><b>Could not load data from Intervals.icu.</b><br>${e.message}<br><br>Check your API key in Vercel environment variables.</div>
-    `;
+    app.innerHTML = `${renderHeader()}<div class="error-msg"><b>Could not load data from Intervals.icu.</b><br>${e.message}<br><br>Check your API key in Vercel environment variables.</div>`;
   }
 }
 
 function renderHeader() {
-  return `
-    <header>
-      <h1>Fuel Plan</h1>
-      <p class="subtle">Auto-generated from Intervals.icu · powered by research</p>
-      <div class="nav-bar">
-        <button class="nav-btn ${activeView === 'plan' ? 'active' : ''}" onclick="switchView('plan')">Plan</button>
-        <button class="nav-btn ${activeView === 'settings' ? 'active' : ''}" onclick="switchView('settings')">Settings</button>
-      </div>
-    </header>`;
+  return `<header>
+    <h1>Fuel Plan</h1>
+    <p class="subtle">Auto-generated from Intervals.icu · powered by research</p>
+    <div class="nav-bar">
+      <button class="nav-btn ${activeView === 'plan' ? 'active' : ''}" onclick="switchView('plan')">Plan</button>
+      <button class="nav-btn ${activeView === 'settings' ? 'active' : ''}" onclick="switchView('settings')">Settings</button>
+    </div>
+  </header>`;
 }
 
 function renderPlan(data) {
@@ -604,17 +606,14 @@ function renderPlan(data) {
   const dates = weekDates(currentMonday);
   const sunday = dates[6];
 
-  // Build day objects
   const days = [];
   for (let i = 0; i < 7; i++) {
     const date = dates[i];
     const evts = data.events ? data.events[date] : null;
     const acts = data.activities ? data.activities[date] : null;
     const hasActual = acts && acts.totalEnergy > 0;
-
     const classified = classifySession(evts ? evts : []);
 
-    // Determine power source
     let rideKcal, avgWatts, durationSec, source;
     if (hasActual) {
       rideKcal = acts.totalEnergy;
@@ -626,75 +625,55 @@ function renderPlan(data) {
       avgWatts = Math.round(classified.intensityFactor * settings.ftp);
       rideKcal = Math.round(avgWatts * durationSec / 1000);
       source = 'estimate';
-
-      // If event has joules, use that instead
       if (evts) {
         const totalJoules = evts.reduce((s, e) => s + (e.joules || 0), 0);
-        if (totalJoules > 0) {
-          rideKcal = Math.round(totalJoules / 1000);
-          source = 'planned';
-        }
+        if (totalJoules > 0) { rideKcal = Math.round(totalJoules / 1000); source = 'planned'; }
       }
     } else {
       rideKcal = 0; avgWatts = 0; durationSec = 0; source = 'none';
     }
 
     const macros = computeDayMacros(rideKcal, durationSec, settings);
-
-    days.push({
-      date, classified, rideKcal, avgWatts, durationSec, source, macros,
-      hasActual, evts, acts
-    });
+    days.push({ date, classified, rideKcal, avgWatts, durationSec, source, macros, hasActual, evts, acts });
   }
 
-  // ── Header + Metrics ──
   let totalHours = days.reduce((s, d) => s + d.durationSec / 3600, 0);
   let totalKcal = days.reduce((s, d) => s + d.macros.kcal, 0);
   let avgKcal = Math.round(totalKcal / 7);
+  const thisMonday = getMonday(todayISO());
 
   let html = renderHeader();
 
-  // Week navigation
-  const thisMonday = getMonday(todayISO());
-  html += `
-    <div class="week-nav">
-      <button onclick="changeWeek(-1)">‹</button>
-      <span class="week-label">${formatDateLong(currentMonday)} — ${formatDateLong(sunday)}${currentMonday === thisMonday ? ' · this week' : ''}</span>
-      <button onclick="changeWeek(1)">›</button>
-    </div>`;
+  html += `<div class="week-nav">
+    <button onclick="changeWeek(-1)">‹</button>
+    <span class="week-label">${formatDateLong(currentMonday)} — ${formatDateLong(sunday)}${currentMonday === thisMonday ? ' · this week' : ''}</span>
+    <button onclick="changeWeek(1)">›</button>
+  </div>`;
 
-  html += `
-    <div class="metrics">
-      <div class="metric"><p class="lbl">FTP</p><p class="val">${settings.ftp}<span class="unit"> W</span></p></div>
-      <div class="metric"><p class="lbl">Daily kcal avg</p><p class="val">${fmt(avgKcal)}<span class="unit"> kcal</span></p></div>
-      <div class="metric"><p class="lbl">Protein floor</p><p class="val">${settings.proteinFloor}<span class="unit"> g/day</span></p></div>
-      <div class="metric"><p class="lbl">Working weight</p><p class="val">${settings.weight}<span class="unit"> kg</span></p></div>
-      <div class="metric"><p class="lbl">Cycling load</p><p class="val">${totalHours.toFixed(1)}<span class="unit"> hr</span></p></div>
-      <div class="metric"><p class="lbl">Off-bike baseline</p><p class="val">${fmt(baseline)}<span class="unit"> kcal</span></p></div>
-    </div>`;
+  html += `<div class="metrics">
+    <div class="metric"><p class="lbl">FTP</p><p class="val">${settings.ftp}<span class="unit"> W</span></p></div>
+    <div class="metric"><p class="lbl">Daily kcal avg</p><p class="val">${fmt(avgKcal)}<span class="unit"> kcal</span></p></div>
+    <div class="metric"><p class="lbl">Protein floor</p><p class="val">${settings.proteinFloor}<span class="unit"> g/day</span></p></div>
+    <div class="metric"><p class="lbl">Working weight</p><p class="val">${settings.weight}<span class="unit"> kg</span></p></div>
+    <div class="metric"><p class="lbl">Cycling load</p><p class="val">${totalHours.toFixed(1)}<span class="unit"> hr</span></p></div>
+    <div class="metric"><p class="lbl">Off-bike baseline</p><p class="val">${fmt(baseline)}<span class="unit"> kcal</span></p></div>
+  </div>`;
 
-  // Calibration
-  html += `
-    <div class="calib">
-      <b>Auto-generated from Intervals.icu.</b> Each ride is costed: <code>ride_kcal ≈ avg_power × duration_s ÷ 1000</code>.
-      Completed rides use actual data; upcoming rides use planned workouts. Deficit target: ~${settings.deficitPerDay} kcal/day.
-      Carbs are the adjustment lever — protein (${settings.proteinFloor}g) and fat stay fixed.
-      Fuel protocols follow Jeukendrup 2014 / Burke 2011 / Thomas 2016 ACSM.
-    </div>`;
+  html += `<div class="calib">
+    <b>Auto-generated from Intervals.icu.</b> Each ride is costed: <code>ride_kcal = avg_power × duration_s ÷ 1000</code>.
+    Completed rides use actual data; upcoming rides use planned workouts. Deficit target: ~${settings.deficitPerDay} kcal/day.
+    Carbs are the adjustment lever — protein (${settings.proteinFloor}g) and fat stay fixed.
+    Fuel protocols follow Jeukendrup 2014 / Burke 2011 / Thomas 2016 ACSM.
+  </div>`;
 
-  // Refresh bar
-  html += `
-    <div class="refresh-bar">
-      <button class="refresh-btn" id="icu-btn" onclick="refreshData()" type="button"><span class="icon">↻</span> Refresh</button>
-      <span class="refresh-status" id="icu-status">Data auto-loaded from Intervals.icu.</span>
-    </div>`;
+  html += `<div class="refresh-bar">
+    <button class="refresh-btn" id="icu-btn" onclick="refreshData()" type="button"><span class="icon">↻</span> Refresh</button>
+    <span class="refresh-status" id="icu-status">Data auto-loaded from Intervals.icu.</span>
+  </div>`;
 
-  // Install prompt
   html += `<div class="install-bar" id="install-bar" onclick="installPWA()">Install on home screen</div>`;
-
   html += `<h2>Day-by-day</h2>`;
 
-  // ── Day cards ──
   days.forEach((day, idx) => {
     const isPast = day.date < today;
     const isToday = day.date === today;
@@ -706,8 +685,6 @@ function renderPlan(data) {
     if (isToday) classes += ' today';
 
     html += `<article class="${classes}" data-date="${day.date}">`;
-
-    // Head
     html += `<div class="day-head">`;
     html += `<span class="day-name">${dayName(day.date)}</span>`;
     html += `<span class="day-date">${formatDate(day.date)}</span>`;
@@ -716,10 +693,8 @@ function renderPlan(data) {
     if (day.hasActual) html += `<span class="pill actual-pill">✓ actual</span>`;
     html += `</div>`;
 
-    // Session
-    html += `<p class="session">${c.session}${hours > 0 ? ` · ${hours.toFixed(1)} h` : ''}</p>`;
+    html += `<p class="session">${c.session}${hours > 0 ? ' · ' + hours.toFixed(1) + ' h' : ''}</p>`;
 
-    // Power line
     if (day.rideKcal > 0) {
       const deficit = day.macros.tdee - day.macros.kcal;
       const isActual = day.source === 'actual';
@@ -730,7 +705,6 @@ function renderPlan(data) {
       html += `<p class="power-line${isActual ? ' actual' : ''}">${powerText}</p>`;
     }
 
-    // Macros
     const mc = day.macros;
     html += `<div class="macro-row">`;
     html += `<div class="macro"><p class="m-lbl">kcal</p><p class="m-val">${fmt(mc.kcal)}</p></div>`;
@@ -738,42 +712,39 @@ function renderPlan(data) {
     html += `<div class="macro"><p class="m-lbl">Protein</p><p class="m-val">${fmt(mc.protein)}<span class="m-unit"> g</span></p></div>`;
     html += `<div class="macro"><p class="m-lbl">Fat</p><p class="m-val">${fmt(mc.fat)}<span class="m-unit"> g</span></p></div>`;
     html += `</div>`;
+    if (mc.macroWhy) {
+      html += `<div class="note"><p style="margin:0;font-size:12px;line-height:1.5">${mc.macroWhy}</p></div>`;
+    }
 
-    // ── Fuel protocols (only for ride days) ──
     if (hours >= 0.75) {
-      // PRE-WORKOUT
       const pre = generatePreFuel(day.durationSec, settings.weight);
       if (pre) {
         html += `<div class="fuel-block pre">`;
         html += `<p class="fuel-label">Pre-workout · ${pre.timing}</p>`;
         html += `<p class="fuel-macro">${pre.carbs} g C · ${pre.protein} g P · ${pre.fat} g F</p>`;
-        html += `<p class="fuel-detail">${pre.carbGkg} g/kg carbs. ${pre.notes}</p>`;
+        pre.why.forEach(w => html += `<p class="fuel-detail">${w}</p>`);
         html += `</div>`;
       }
 
-      // INTRA-WORKOUT
       const intra = generateIntraFuel(day.durationSec, settings.weight);
       html += `<div class="fuel-block intra">`;
       html += `<p class="fuel-label">During workout${intra.rate > 0 ? ' · ' + intra.rate + ' g/h target' : ''}</p>`;
       if (intra.total > 0) {
         html += `<p class="fuel-macro">~${intra.total} g CHO total · ${intra.sodium} sodium · ${intra.fluid} fluid</p>`;
       }
-      html += `<p class="fuel-detail">${intra.type}</p>`;
-      html += `<p class="fuel-detail">${intra.detail}</p>`;
+      intra.why.forEach(w => html += `<p class="fuel-detail">${w}</p>`);
       html += `</div>`;
 
-      // POST-WORKOUT
       const post = generatePostFuel(day.durationSec, settings.weight, day.classified.intensityFactor);
       if (post) {
         html += `<div class="fuel-block post">`;
         html += `<p class="fuel-label">Post-workout · ${post.timing}</p>`;
         html += `<p class="fuel-macro">${post.carbs} g C (${post.carbGkg} g/kg) · ${post.protein} g P (0.3 g/kg)</p>`;
-        html += `<p class="fuel-detail">${post.notes}</p>`;
+        post.why.forEach(w => html += `<p class="fuel-detail">${w}</p>`);
         html += `</div>`;
       }
     }
 
-    // ── Preload advice ──
     const nextDay = idx < 6 ? days[idx + 1] : null;
     if (nextDay) {
       const nextDayName = dayName(nextDay.date);
@@ -788,96 +759,57 @@ function renderPlan(data) {
     html += `</article>`;
   });
 
-  // Footer
-  html += `
-    <div class="foot">
-      <p style="margin:0"><b>Troubleshooting:</b> Dragging mid-week → add 200 kcal/day (carbs). Weight stalling → pull rest-day carbs by 50g.
-      Tracking weighs on mood → simplify to protein + ride fuel only. Sick → pause deficit, eat maintenance.</p>
-    </div>`;
+  html += `<div class="foot">
+    <p style="margin:0"><b>Troubleshooting:</b> Dragging mid-week → add 200 kcal/day (carbs). Weight stalling → pull rest-day carbs by 50g.
+    Tracking weighs on mood → simplify to protein + ride fuel only. Sick → pause deficit, eat maintenance.</p>
+  </div>`;
 
   app.innerHTML = html;
 
-  // Scroll today into view
   const todayCard = document.querySelector('.day.today');
-  if (todayCard) {
-    setTimeout(() => todayCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
-  }
+  if (todayCard) setTimeout(() => todayCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
 }
 
 // ════════════════════════════════════════════════════════════════
 //  SETTINGS VIEW
 // ════════════════════════════════════════════════════════════════
-
 function renderSettings() {
   const app = document.getElementById('app');
   const s = loadSettings();
   const baseline = getOffBikeBaseline(s);
 
   let html = renderHeader();
-
   html += `<h2>Settings</h2>`;
   html += `<p class="subtle">These values drive all macro and fuel calculations. Stored in your browser.</p>`;
 
-  html += `
-    <div class="settings-grid">
-      <div class="setting-field">
-        <label>FTP (W)</label>
-        <input type="number" id="s-ftp" value="${s.ftp}" step="1">
-        <span class="hint">Functional threshold power</span>
-      </div>
-      <div class="setting-field">
-        <label>Weight (kg)</label>
-        <input type="number" id="s-weight" value="${s.weight}" step="0.5">
-        <span class="hint">Working bodyweight</span>
-      </div>
-      <div class="setting-field">
-        <label>BMR (kcal/day)</label>
-        <input type="number" id="s-bmr" value="${s.bmr}" step="5">
-        <span class="hint">Basal metabolic rate</span>
-      </div>
-      <div class="setting-field">
-        <label>NEAT multiplier</label>
-        <input type="number" id="s-neat" value="${s.neatMultiplier}" step="0.05" min="1.0" max="1.6">
-        <span class="hint">Off-bike activity factor (1.10–1.40)</span>
-      </div>
-      <div class="setting-field">
-        <label>Daily deficit (kcal)</label>
-        <input type="number" id="s-deficit" value="${s.deficitPerDay}" step="10">
-        <span class="hint">Target daily deficit. 270 ≈ 0.25 kg/wk</span>
-      </div>
-      <div class="setting-field">
-        <label>Protein floor (g/day)</label>
-        <input type="number" id="s-protein" value="${s.proteinFloor}" step="5">
-        <span class="hint">Min daily protein (~2 g/kg during deficit)</span>
-      </div>
-      <div class="setting-field">
-        <label>Protein long day (g)</label>
-        <input type="number" id="s-proteinLong" value="${s.proteinLongDay}" step="5">
-        <span class="hint">Protein on 3.5h+ ride days</span>
-      </div>
-    </div>`;
+  html += `<div class="settings-grid">
+    <div class="setting-field"><label>FTP (W)</label><input type="number" id="s-ftp" value="${s.ftp}" step="1"><span class="hint">Functional threshold power</span></div>
+    <div class="setting-field"><label>Weight (kg)</label><input type="number" id="s-weight" value="${s.weight}" step="0.5"><span class="hint">Working bodyweight</span></div>
+    <div class="setting-field"><label>BMR (kcal/day)</label><input type="number" id="s-bmr" value="${s.bmr}" step="5"><span class="hint">Basal metabolic rate</span></div>
+    <div class="setting-field"><label>NEAT multiplier</label><input type="number" id="s-neat" value="${s.neatMultiplier}" step="0.05" min="1.0" max="1.6"><span class="hint">Off-bike activity factor (1.10–1.40)</span></div>
+    <div class="setting-field"><label>Daily deficit (kcal)</label><input type="number" id="s-deficit" value="${s.deficitPerDay}" step="10"><span class="hint">Target daily deficit. 270 = ~0.25 kg/wk</span></div>
+    <div class="setting-field"><label>Protein floor (g/day)</label><input type="number" id="s-protein" value="${s.proteinFloor}" step="5"><span class="hint">Min daily protein (~2 g/kg during deficit)</span></div>
+    <div class="setting-field"><label>Protein long day (g)</label><input type="number" id="s-proteinLong" value="${s.proteinLongDay}" step="5"><span class="hint">Protein on 3.5h+ ride days</span></div>
+  </div>`;
 
-  html += `
-    <div class="derived">
-      <b>Derived values:</b><br>
-      Off-bike baseline = BMR × NEAT = ${fmt(s.bmr)} × ${s.neatMultiplier} = <b>${fmt(baseline)} kcal/day</b><br>
-      TDEE on ride days = ${fmt(baseline)} + ride_kcal<br>
-      Protein per kg = ${(s.proteinFloor / s.weight).toFixed(2)} g/kg/d
-    </div>`;
+  html += `<div class="derived">
+    <b>Derived values:</b><br>
+    Off-bike baseline = BMR × NEAT = ${fmt(s.bmr)} × ${s.neatMultiplier} = <b>${fmt(baseline)} kcal/day</b><br>
+    TDEE on ride days = ${fmt(baseline)} + ride_kcal<br>
+    Protein per kg = ${(s.proteinFloor / s.weight).toFixed(2)} g/kg/d
+  </div>`;
 
-  html += `
-    <div class="settings-actions">
-      <button class="btn-save" onclick="saveSettingsFromForm()">Save</button>
-      <button class="btn-reset" onclick="resetSettings()">Reset to defaults</button>
-    </div>`;
+  html += `<div class="settings-actions">
+    <button class="btn-save" onclick="saveSettingsFromForm()">Save</button>
+    <button class="btn-reset" onclick="resetSettings()">Reset to defaults</button>
+  </div>`;
 
-  html += `
-    <div class="calib" style="margin-top: 20px;">
-      <b>Research basis:</b> TDEE formula follows power-based costing (kJ ≈ kcal at ~22–25% gross efficiency).
-      Protein per Phillips & van Loon 2011: 1.2–2.0 g/kg/d, 0.3 g/kg per meal, 4–5 meals/day.
-      Carb periodization per Burke 2011 / Stellingwerff: fuel for the work required.
-      Deficit of ~270 kcal/day targets ~0.25 kg/week fat loss while preserving lean mass.
-    </div>`;
+  html += `<div class="calib" style="margin-top:20px">
+    <b>Research basis:</b> TDEE formula follows power-based costing (kJ = kcal at ~22–25% gross efficiency).
+    Protein per Phillips & van Loon 2011: 1.2–2.0 g/kg/d, 0.3 g/kg per meal, 4–5 meals/day.
+    Carb periodization per Burke 2011 / Stellingwerff: fuel for the work required.
+    Deficit of ~270 kcal/day targets ~0.25 kg/week fat loss while preserving lean mass.
+  </div>`;
 
   app.innerHTML = html;
 }
@@ -893,7 +825,7 @@ function saveSettingsFromForm() {
     proteinLongDay: parseInt(document.getElementById('s-proteinLong').value) || DEFAULTS.proteinLongDay,
   };
   saveSettings(s);
-  cachedData = {}; // Clear cache to recalculate
+  cachedData = {};
   switchView('plan');
 }
 
@@ -905,22 +837,9 @@ function resetSettings() {
 // ════════════════════════════════════════════════════════════════
 //  NAVIGATION
 // ════════════════════════════════════════════════════════════════
-
-function switchView(view) {
-  activeView = view;
-  renderApp();
-}
-
-function changeWeek(delta) {
-  currentMonday = addDays(currentMonday, delta * 7);
-  loadAndRenderPlan();
-}
-
-function refreshData() {
-  const key = currentMonday;
-  delete cachedData[key]; // Force re-fetch
-  loadAndRenderPlan();
-}
+function switchView(view) { activeView = view; renderApp(); }
+function changeWeek(delta) { currentMonday = addDays(currentMonday, delta * 7); loadAndRenderPlan(); }
+function refreshData() { delete cachedData[currentMonday]; loadAndRenderPlan(); }
 
 // ════════════════════════════════════════════════════════════════
 //  PWA Install
@@ -932,15 +851,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
   const bar = document.getElementById('install-bar');
   if (bar) bar.style.display = 'block';
 });
-
 function installPWA() {
   if (!deferredInstallPrompt) return;
   deferredInstallPrompt.prompt();
-  deferredInstallPrompt.userChoice.then(() => {
-    deferredInstallPrompt = null;
-    const bar = document.getElementById('install-bar');
-    if (bar) bar.style.display = 'none';
-  });
+  deferredInstallPrompt.userChoice.then(() => { deferredInstallPrompt = null; const bar = document.getElementById('install-bar'); if (bar) bar.style.display = 'none'; });
 }
 
 // ════════════════════════════════════════════════════════════════
