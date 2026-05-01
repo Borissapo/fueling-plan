@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const { oldest, newest } = req.query;
+  const { oldest, newest, debug } = req.query;
   if (!oldest || !newest) {
     return res.status(400).json({ error: 'Missing oldest or newest query parameters (YYYY-MM-DD).' });
   }
@@ -43,11 +43,24 @@ export default async function handler(req, res) {
       const text = await response.text();
       return res.status(response.status).json({
         error: `Intervals.icu API error: ${response.status}`,
-        detail: text
+        detail: text,
+        url_called: url,
+        athlete_id: athleteId
       });
     }
 
     const activities = await response.json();
+
+    // Debug mode: return raw API response
+    if (debug === 'true') {
+      return res.status(200).json({
+        _debug: true,
+        athlete_id: athleteId,
+        url_called: url,
+        activity_count: activities.length,
+        activities: activities.slice(0, 10) // first 10 only
+      });
+    }
 
     // Return only the fields we need, grouped by date
     const byDate = {};
