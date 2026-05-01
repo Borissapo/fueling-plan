@@ -82,17 +82,21 @@ export default async function handler(req, res) {
         name: act.name || '',
         type: act.type || '',
         date: date,
-        movingTime: act.moving_time || 0,         // seconds
-        elapsedTime: act.elapsed_time || 0,        // seconds
-        avgWatts: act.average_watts || null, // Use average power, NOT normalized (icu_weighted_avg_watts)
+        movingTime: act.moving_time || act.elapsed_time || 0,  // seconds
+        elapsedTime: act.elapsed_time || 0,
+        avgWatts: act.icu_average_watts || null,  // Use ICU average power, NOT normalized (icu_weighted_avg_watts)
+        normalizedWatts: act.icu_weighted_avg_watts || null,
         maxWatts: act.max_watts || null,
-        energy: act.joules ? Math.round(act.joules / 4184) : null, // joules → kcal
+        // icu_joules is mechanical work; divide by 1000 → kJ ≈ kcal food energy cost
+        energy: act.icu_joules ? Math.round(act.icu_joules / 1000)
+              : act.calories ? Math.round(act.calories)
+              : null,
         icu_training_load: act.icu_training_load || null,
-        icu_intensity: act.icu_intensity || null,   // like IF
-        distance: act.distance || 0,                // meters
+        icu_intensity: act.icu_intensity || null,
+        distance: act.distance || act.icu_distance || 0,
       };
 
-      // If joules not available, estimate from avg power × time
+      // If energy still not available, estimate from avg power × time
       if (!entry.energy && entry.avgWatts && entry.movingTime) {
         entry.energy = Math.round(entry.avgWatts * entry.movingTime / 1000);
       }
