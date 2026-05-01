@@ -178,6 +178,7 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 /* Fuel protocol blocks */
 .fuel-block { border-radius: var(--r-md); padding: 12px 14px; margin: 6px 0; }
 .fuel-block.pre { background: var(--pre-bg); color: var(--pre-text); }
+.fuel-block.pre.train-low { background: #1a2e1a; border: 1px dashed #4a7a4a; }
 .fuel-block.intra { background: var(--intra-bg); color: var(--intra-text); }
 .fuel-block.post { background: var(--post-bg); color: var(--post-text); }
 .fuel-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px; }
@@ -424,27 +425,73 @@ function computeDayMacros(rideKcal, durationSec, settings) {
 //  + Thomas 2016 ACSM + Sawka 2007 hydration
 // ────────────────────────────────────────────────────────────────
 
-function generatePreFuel(durationSec, weight) {
+function generatePreFuel(durationSec, weight, intensityFactor) {
   const hours = durationSec / 3600;
   if (hours < 0.75) return null;
 
+  const band = getIntensityBand(intensityFactor || 0);
+  const ifDisplay = intensityFactor ? intensityFactor.toFixed(2) : '?';
+
+  // ── Train-low option: easy sessions → protein+fat only ────
+  if (band === 'easy' && hours < 2.5) {
+    return {
+      carbs: 0, protein: 20, fat: 10, timing: '60–90 min before (train-low)',
+      carbGkg: '0', trainLow: true,
+      why: [
+        `<b>Train-low pre-meal (IF ${ifDisplay}).</b> Stellingwerff/Impey 2018: commencing low-intensity sessions (IF &lt;0.65) with reduced muscle glycogen amplifies AMPK/PGC-1α signalling for mitochondrial biogenesis. Burke 2011 periodised model: "fuel for the work required" — adaptation sessions don't need topped-up glycogen.`,
+        `<b>Protein 20g + fat 10g:</b> Provides satiety and amino acid availability without spiking insulin or refilling glycogen. Phillips & van Loon 2011: pre-exercise protein supports MPS regardless of CHO availability.`,
+        `<b>Examples:</b> 2 eggs scrambled, small handful of almonds, Greek yogurt (no honey), protein shake with nut butter. Avoid: bread, banana, oats, anything high-GI.`,
+        `<b>Caveats:</b> Only if (1) you haven't done &gt;2 train-low sessions this week, (2) you slept well, (3) you're not in a heavy deficit. If in doubt, fuel normally with carbs.`,
+      ]
+    };
+  }
+
+  // ── 2D pre-fuel matrix: duration × intensity ──────────────
+  //
+  //  Duration     | Easy (IF<0.65)   | Moderate (0.65-0.80) | Hard (IF>0.80)
+  //  <1.5h        | 0.5 g/kg         | 0.5 g/kg             | 1.0 g/kg
+  //  1.5–2.5h     | 0.5 g/kg         | 0.8 g/kg             | 1.5 g/kg
+  //  2.5–3.5h     | 0.8 g/kg         | 1.0 g/kg             | 2.0 g/kg
+  //  >3.5h        | 1.0 g/kg         | 1.2 g/kg             | 2.5 g/kg
+
   let carbGkg;
-  if (hours < 1.5) carbGkg = 0.5;
-  else if (hours < 2.5) carbGkg = 0.8;
-  else if (hours < 3.5) carbGkg = 1.0;
-  else carbGkg = 1.2;
+  if (hours < 1.5) {
+    carbGkg = band === 'hard' ? 1.0 : 0.5;
+  } else if (hours < 2.5) {
+    carbGkg = band === 'hard' ? 1.5 : band === 'moderate' ? 0.8 : 0.5;
+  } else if (hours < 3.5) {
+    carbGkg = band === 'hard' ? 2.0 : band === 'moderate' ? 1.0 : 0.8;
+  } else {
+    carbGkg = band === 'hard' ? 2.5 : band === 'moderate' ? 1.2 : 1.0;
+  }
 
   const carbs = Math.round(carbGkg * weight);
-  const protein = 5;
-  const fat = 0;
+  let protein, fat, timing;
 
-  const why = [
-    `<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g):</b> Thomas 2016 ACSM recommends 1–4 g/kg 1–4h pre-exercise. At 30 min, dose is scaled to ${carbGkg.toFixed(1)} g/kg to allow gastric emptying before effort. Focus on quick-digesting CHO (glucose, sucrose, maltodextrin) — avoid fructose-only sources which empty slower (Jeukendrup & Gleeson, Sport Nutrition Ch. 8).`,
-    `<b>Protein ~5g, fat 0g:</b> Both slow gastric emptying. At 30 min pre, keep minimal to reduce GI distress risk (Burke et al. 2011: pre-event meal should be "low fat, low fibre, moderate protein" — but at 30 min the window is too short for significant protein).`,
-    `<b>Examples:</b> 1–2 gels, banana + honey, white bread + jam, rice cake + honey, dates. Avoid: oats, eggs, yogurt, anything with fat or fibre.`,
-  ];
+  if (band === 'hard') {
+    // Hard: bigger meal, earlier timing to allow digestion
+    protein = 10;
+    fat = 5;
+    timing = hours >= 2.5 ? '2–3h before' : '60–90 min before';
+  } else {
+    protein = 5;
+    fat = 0;
+    timing = '30 min before';
+  }
 
-  return { carbs, protein, fat, timing: '30 min before', carbGkg: carbGkg.toFixed(1), why };
+  const why = [];
+
+  if (band === 'hard') {
+    why.push(`<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g) — intensity-boosted (IF ${ifDisplay}).</b> Burke 2011 & Thomas 2016: pre-exercise CHO should top off liver glycogen and augment muscle glycogen when high depletion is expected. At IF &gt;0.80, CHO oxidation rate is maximal (Hawley & Leckey 2015) — arriving with full stores is critical. Dose bumped from standard ${hours < 1.5 ? '0.5' : hours < 2.5 ? '0.8' : hours < 3.5 ? '1.0' : '1.2'} to ${carbGkg.toFixed(1)} g/kg.`);
+    why.push(`<b>Timing ${timing}:</b> Larger CHO bolus (${carbs}g) needs more gastric emptying time to avoid GI distress at high intensity. Burke 2011: "the higher the intensity, the more time needed for gastric clearance." Eat low-fibre, low-fat, moderate-GI foods.`);
+    why.push(`<b>Examples:</b> Rice + honey, white toast + jam + banana, porridge with syrup (if 2h+ before), energy bar + banana, rice cakes. At ${carbGkg.toFixed(1)} g/kg you may need to combine solid + liquid CHO (e.g. food + sports drink).`);
+  } else {
+    why.push(`<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g) (IF ${ifDisplay}).</b> Thomas 2016 ACSM recommends 1–4 g/kg 1–4h pre-exercise. At 30 min, dose is scaled to ${carbGkg.toFixed(1)} g/kg to allow gastric emptying before effort. Focus on quick-digesting CHO (glucose, sucrose, maltodextrin) — avoid fructose-only sources which empty slower (Jeukendrup & Gleeson, Sport Nutrition Ch. 8).`);
+    why.push(`<b>Protein ~5g, fat 0g:</b> Both slow gastric emptying. At 30 min pre, keep minimal to reduce GI distress risk (Burke et al. 2011: pre-event meal should be "low fat, low fibre, moderate protein" — but at 30 min the window is too short for significant protein).`);
+    why.push(`<b>Examples:</b> 1–2 gels, banana + honey, white bread + jam, rice cake + honey, dates. Avoid: oats, eggs, yogurt, anything with fat or fibre.`);
+  }
+
+  return { carbs, protein, fat, timing, carbGkg: carbGkg.toFixed(1), trainLow: false, why };
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -829,10 +876,10 @@ function renderPlan(data) {
     }
 
     if (hours >= 0.75) {
-      const pre = generatePreFuel(day.durationSec, settings.weight);
+      const pre = generatePreFuel(day.durationSec, settings.weight, day.fuelingIF);
       if (pre) {
-        html += `<div class="fuel-block pre">`;
-        html += `<p class="fuel-label">Pre-workout · ${pre.timing}</p>`;
+        html += `<div class="fuel-block pre${pre.trainLow ? ' train-low' : ''}">`;
+        html += `<p class="fuel-label">Pre-workout · ${pre.timing}${day.fuelingIF ? ' · IF ' + day.fuelingIF.toFixed(2) : ''}</p>`;
         html += `<p class="fuel-macro">${pre.carbs} g C · ${pre.protein} g P · ${pre.fat} g F</p>`;
         pre.why.forEach(w => html += `<p class="fuel-detail">${w}</p>`);
         html += `</div>`;
