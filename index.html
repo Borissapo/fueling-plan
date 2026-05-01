@@ -207,9 +207,13 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
 .setting-field { display: flex; flex-direction: column; gap: 4px; }
 .setting-field label { font-size: 13px; font-weight: 500; color: var(--text-muted); }
-.setting-field input { appearance: none; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 10px 12px; font: inherit; font-size: 15px; color: var(--text); width: 100%; }
-.setting-field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.setting-field input, .setting-field select { appearance: none; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 10px 12px; font: inherit; font-size: 15px; color: var(--text); width: 100%; }
+.setting-field input:focus, .setting-field select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.setting-field select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236E6E68' fill='none' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 .setting-field .hint { font-size: 11px; color: var(--text-faint); }
+.deficit-why { font-size: 12px; line-height: 1.5; color: var(--text-muted); margin-top: 6px; padding: 10px 12px; background: var(--info-bg); border-radius: var(--r-md); }
+.deficit-custom { margin-top: 6px; display: none; }
+.deficit-custom.show { display: block; }
 .settings-actions { display: flex; gap: 10px; margin: 16px 0; }
 .settings-actions button { appearance: none; border: 0; padding: 10px 20px; border-radius: var(--r-md); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
 .btn-save { background: var(--accent); color: #fff; }
@@ -238,10 +242,6 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
   <div class="loading-msg" id="loading">Connecting to Intervals.icu…</div>
 </div>
 
-<script>
-// ════════════════════════════════════════════════════════════════
-//  SETTINGS — localStorage persistence
-// ════════════════════════════════════════════════════════════════
 const DEFAULTS = {
   ftp: 321,
   weight: 81,
@@ -787,7 +787,18 @@ function renderSettings() {
     <div class="setting-field"><label>Weight (kg)</label><input type="number" id="s-weight" value="${s.weight}" step="0.5"><span class="hint">Working bodyweight</span></div>
     <div class="setting-field"><label>BMR (kcal/day)</label><input type="number" id="s-bmr" value="${s.bmr}" step="5"><span class="hint">Basal metabolic rate</span></div>
     <div class="setting-field"><label>NEAT multiplier</label><input type="number" id="s-neat" value="${s.neatMultiplier}" step="0.05" min="1.0" max="1.6"><span class="hint">Off-bike activity factor (1.10–1.40)</span></div>
-    <div class="setting-field"><label>Daily deficit (kcal)</label><input type="number" id="s-deficit" value="${s.deficitPerDay}" step="10"><span class="hint">Target daily deficit. 270 = ~0.25 kg/wk</span></div>
+    <div class="setting-field" style="grid-column:1/-1">
+      <label>Daily deficit strategy</label>
+      <select id="s-deficit-preset" onchange="onDeficitPresetChange()">
+        <option value="0"${s.deficitPerDay === 0 ? ' selected' : ''}>Maintenance — 0 kcal/day (no deficit)</option>
+        <option value="270"${s.deficitPerDay === 270 ? ' selected' : ''}>Conservative — 270 kcal/day (~0.25 kg/wk)</option>
+        <option value="400"${s.deficitPerDay === 400 ? ' selected' : ''}>Moderate — 400 kcal/day (~0.35 kg/wk)</option>
+        <option value="540"${s.deficitPerDay === 540 ? ' selected' : ''}>Aggressive — 540 kcal/day (~0.5 kg/wk)</option>
+        <option value="custom"${![0,270,400,540].includes(s.deficitPerDay) ? ' selected' : ''}>Custom</option>
+      </select>
+      <input type="number" id="s-deficit" value="${s.deficitPerDay}" step="10" class="deficit-custom${![0,270,400,540].includes(s.deficitPerDay) ? ' show' : ''}">
+      <div class="deficit-why" id="deficit-why"></div>
+    </div>
     <div class="setting-field"><label>Protein floor (g/day)</label><input type="number" id="s-protein" value="${s.proteinFloor}" step="5"><span class="hint">Min daily protein (~2 g/kg during deficit)</span></div>
     <div class="setting-field"><label>Protein long day (g)</label><input type="number" id="s-proteinLong" value="${s.proteinLongDay}" step="5"><span class="hint">Protein on 3.5h+ ride days</span></div>
   </div>`;
@@ -812,6 +823,31 @@ function renderSettings() {
   </div>`;
 
   app.innerHTML = html;
+  onDeficitPresetChange(); // populate the research note on load
+}
+
+const DEFICIT_INFO = {
+  '0': '<b>Maintenance (0 kcal/day):</b> No weight loss — eat at TDEE. Use during race week, recovery blocks, or illness. Thomas 2016 ACSM: energy availability should stay ≥45 kcal/kg FFM/day for optimal health and performance.',
+  '270': '<b>Conservative (270 kcal/day ≈ 0.25 kg/wk):</b> Garthe et al. 2011 found that slower weight loss (~0.7% BW/week) preserved significantly more lean mass and strength vs faster loss. At 81 kg this is ~0.3% BW/week — safest option during heavy training blocks. Recommended for build/peak phases.',
+  '400': '<b>Moderate (400 kcal/day ≈ 0.35 kg/wk):</b> Roughly 0.5% BW/week. Hector & Phillips 2018 review: up to 0.5% BW/week is sustainable for trained athletes when protein is ≥2 g/kg/d. Acceptable during base phase or lower-volume weeks. Monitor power output — if FTP drops, reduce deficit.',
+  '540': '<b>Aggressive (540 kcal/day ≈ 0.5 kg/wk):</b> Approaching 0.7% BW/week. Garthe 2011: this rate showed measurable lean mass and strength loss in athletes. Only use in off-season or very low-volume periods. Risk of RED-S increases — Thomas 2016: energy availability below 30 kcal/kg FFM/day impairs hormonal, metabolic, and bone health. Time-limit to 4–6 weeks max.',
+  'custom': '<b>Custom deficit:</b> Set your own value. Research guideline: stay below ~0.7% body weight loss per week (Garthe 2011) and keep energy availability above 30 kcal/kg FFM/day (Loucks 2004, Thomas 2016) to avoid RED-S.'
+};
+
+function onDeficitPresetChange() {
+  const sel = document.getElementById('s-deficit-preset');
+  const input = document.getElementById('s-deficit');
+  const info = document.getElementById('deficit-why');
+  if (!sel || !input || !info) return;
+
+  const val = sel.value;
+  if (val === 'custom') {
+    input.classList.add('show');
+  } else {
+    input.classList.remove('show');
+    input.value = val;
+  }
+  info.innerHTML = DEFICIT_INFO[val] || '';
 }
 
 function saveSettingsFromForm() {
