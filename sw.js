@@ -1,4 +1,4 @@
-const CACHE = 'fuel-v3';
+const CACHE = 'fuel-v4';
 const SHELL = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -19,8 +19,14 @@ self.addEventListener('fetch', e => {
   // API calls: network only (no caching API responses)
   if (e.request.url.includes('/api/')) return;
 
-  // App shell: cache-first
+  // App shell: network-first, fall back to cache when offline
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(response => {
+        const clone = response.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
