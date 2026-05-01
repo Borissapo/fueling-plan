@@ -250,6 +250,7 @@ const DEFAULTS = {
   deficitPerDay: 270,
   proteinFloor: 160,
   proteinLongDay: 165,
+  variabilityIndex: 1.18,
 };
 
 function loadSettings() {
@@ -445,40 +446,134 @@ function generatePreFuel(durationSec, weight) {
   return { carbs, protein, fat, timing: '30 min before', carbGkg: carbGkg.toFixed(1), why };
 }
 
-function generateIntraFuel(durationSec, weight) {
-  const hours = durationSec / 3600;
+// ────────────────────────────────────────────────────────────────
+//  2D FUELING MATRIX — Duration × Intensity (Jeukendrup 2014 +
+//  Hawley & Leckey 2015 substrate-dependence + Stellingwerff/
+//  Impey 2018 train-low)
+//
+//  intensityFactor here is NP-based IF, NOT avg-power-based.
+//  For planned rides: estimatedIF = avgPower × VI / FTP
+//  For actuals: real IF from Intervals.icu
+// ────────────────────────────────────────────────────────────────
 
+function getIntensityBand(intensityFactor) {
+  if (intensityFactor < 0.65) return 'easy';
+  if (intensityFactor <= 0.80) return 'moderate';
+  return 'hard';
+}
+
+function generateIntraFuel(durationSec, weight, intensityFactor, sessionType) {
+  const hours = durationSec / 3600;
+  const band = getIntensityBand(intensityFactor || 0);
+  const ifDisplay = intensityFactor ? intensityFactor.toFixed(2) : '?';
+
+  // ── Under 45 min ──────────────────────────────────────────
   if (hours < 0.75) {
+    if (band === 'hard') {
+      // Short + hard: mouth rinse has central benefit (Chambers et al.)
+      return {
+        rate: 0, total: 0, sodium: 0, fluid: '400–600 ml/h', trainLow: false,
+        why: [
+          `<b>Mouth rinse recommended (IF ${ifDisplay}).</b> At &lt;45 min, glycogen stores are sufficient for substrate — but at high intensity (IF &gt;0.80), CHO mouth rinsing improves performance ~2–3% via central/oropharyngeal pathways (Chambers et al.; Jeukendrup 2014). Swirl 4–6% CHO solution for 5–10 sec.`,
+          `<b>Fluid:</b> Sawka 2007 ACSM: drink to thirst for short efforts.`
+        ]
+      };
+    }
     return {
-      rate: 0, total: 0, sodium: 0, fluid: 0,
+      rate: 0, total: 0, sodium: 0, fluid: 0, trainLow: false,
       why: [`<b>No fueling needed.</b> Muscle glycogen stores (~400–500g when full) are sufficient for efforts under 45 min (Burke et al. 2011; Jeukendrup 2014 decision tree: events &lt;30 min → no CHO).`]
     };
   }
+
+  // ── 45 min – 1h 15min ────────────────────────────────────
   if (hours < 1.25) {
-    return {
-      rate: 0, total: 0, sodium: 0, fluid: '400–600 ml/h',
+    if (band === 'hard') {
+      // Hard short effort: bump to 30 g/h — substrate demand is real
+      return {
+        rate: 30, total: Math.round(30 * Math.max(0, hours - 0.5)), sodium: '300–500 mg/L', fluid: '400–750 ml/h', trainLow: false,
+        why: [
+          `<b>CHO rate: 30 g/h (IF ${ifDisplay} — intensity bump).</b> Standard duration ladder says mouth rinse only at 45–75 min (Jeukendrup 2014). But at IF &gt;0.80, CHO oxidation rate is high — Hawley & Leckey 2015: above ~75% VO₂max, Type II fibres are heavily recruited and CHO is the dominant substrate. Ingesting 30 g/h supports both the central pathway and substrate delivery. Single-source CHO is fine.`,
+          `<b>Fluid:</b> Sawka 2007: 400–750 ml/h depending on sweat rate.`
+        ]
+      };
+    }
+    // Easy or moderate: standard mouth-rinse protocol
+    const trainLow = band === 'easy' && (sessionType === 'easy');
+    const result = {
+      rate: 0, total: 0, sodium: 0, fluid: '400–600 ml/h', trainLow,
       why: [
-        `<b>Mouth rinse only.</b> Jeukendrup 2014 & Burke 2011: for 30–75 min sustained efforts, swirling a 4–6% CHO solution in the mouth for 5–10 sec improves performance ~2–3% via central/oropharyngeal pathways (Chambers et al. fMRI studies showed brain reward-centre activation). No need to swallow — substrate isn't the limiter at this duration.`,
+        `<b>Mouth rinse only (IF ${ifDisplay}).</b> Jeukendrup 2014 & Burke 2011: for 30–75 min sustained efforts, swirling a 4–6% CHO solution in the mouth for 5–10 sec improves performance ~2–3% via central/oropharyngeal pathways (Chambers et al. fMRI studies showed brain reward-centre activation). No need to swallow — substrate isn't the limiter at this duration.`,
         `<b>Fluid:</b> Sawka 2007 ACSM: 400–800 ml/h depending on sweat rate and conditions. Drink to thirst for short efforts.`
       ]
     };
+    if (trainLow) {
+      result.why.push(`<b>Train-low option:</b> This is a low-intensity session (IF ${ifDisplay}). You can skip the mouth rinse and ride on water + electrolytes only for adaptation benefit — Stellingwerff/Impey 2018: low-CHO availability during Z2 work amplifies AMPK/PGC-1α signalling for mitochondrial biogenesis. Only if you haven't done &gt;2 low-CHO sessions this week and tomorrow isn't a key session.`);
+    }
+    return result;
   }
 
+  // ── 1h 15min+ : 2D matrix lookup ─────────────────────────
   let rate, sodium, fluid;
   const why = [];
+  let trainLow = false;
+
+  // Matrix: rows = duration bins, columns = intensity bands
+  //
+  //  Duration         | Easy (IF<0.65)      | Moderate (0.65-0.80) | Hard (IF>0.80)
+  //  1h15 – 2h        | train-low OR 30 g/h | 30 g/h               | 60 g/h
+  //  2h – 2h30        | 30 g/h (or TL if Z2)| 60 g/h               | 80 g/h
+  //  2h30 – 3h30      | 60 g/h              | 80 g/h               | 90 g/h
+  //  > 3h30           | 80 g/h              | 90 g/h               | 90+ g/h (gut-trained)
 
   if (hours < 2) {
-    rate = 30; sodium = '300–500'; fluid = '400–750';
-    why.push(`<b>CHO rate: 30 g/h.</b> Burke et al. 2011 duration ladder: 1–2h events → 30–60 g/h. At the shorter end, 30 g/h is sufficient. Single-source CHO OK (glucose, maltodextrin, sucrose) — SGLT1 transporter handles up to ~60 g/h before saturation (Jeukendrup 2014).`);
+    if (band === 'hard') {
+      rate = 60; sodium = '500–700'; fluid = '500–750';
+      why.push(`<b>CHO rate: 60 g/h (IF ${ifDisplay} — intensity bump).</b> Standard duration ladder: 30 g/h for 1–2h (Burke 2011). But at IF &gt;0.80, CHO oxidation rate is significantly elevated — Hawley & Leckey 2015: above the crossover point (~75% VO₂max), Type II fibre recruitment makes CHO the dominant substrate. Bumped one tier to match glycogen demand. Consider multi-transportable CHO (2:1 glu:fru) at 60 g/h to avoid SGLT1 saturation (Jeukendrup 2014).`);
+    } else if (band === 'easy') {
+      rate = 30; sodium = '300–500'; fluid = '400–750';
+      trainLow = true;
+      why.push(`<b>CHO rate: 30 g/h (IF ${ifDisplay}).</b> Burke et al. 2011 duration ladder: 1–2h events → 30–60 g/h. At low intensity, 30 g/h is sufficient — fat oxidation contributes a larger share of substrate below the crossover point (Hawley & Leckey 2015). Single-source CHO OK.`);
+      why.push(`<b>Train-low option:</b> At IF ${ifDisplay}, this is a Z2 session — you can ride on water + electrolytes only for adaptation benefit. Stellingwerff/Impey 2018: low-CHO availability during endurance work amplifies AMPK-dependent signalling for mitochondrial biogenesis (glycogen threshold hypothesis). Only do this if: (1) you haven't done &gt;2 low-CHO sessions this week, (2) tomorrow isn't a hard or long session, (3) you're not in a heavy deficit. If in doubt, fuel normally.`);
+    } else {
+      rate = 30; sodium = '300–500'; fluid = '400–750';
+      why.push(`<b>CHO rate: 30 g/h (IF ${ifDisplay}).</b> Burke et al. 2011 duration ladder: 1–2h events → 30–60 g/h. At moderate intensity, 30 g/h is sufficient. Single-source CHO OK (glucose, maltodextrin, sucrose) — SGLT1 transporter handles up to ~60 g/h before saturation (Jeukendrup 2014).`);
+    }
   } else if (hours < 2.5) {
-    rate = 60; sodium = '500–700'; fluid = '500–750';
-    why.push(`<b>CHO rate: 60 g/h.</b> Burke et al. 2011: 2–3h events → up to 60 g/h. This is the practical ceiling for single-source CHO — the intestinal SGLT1 glucose transporter saturates at ~1.0–1.1 g/min (Jeukendrup 2014). Above 60 g/h with single-source, unabsorbed CHO draws water into the gut lumen → GI distress. Consider multi-transportable (2:1 glu:fru) if gut tolerates it.`);
+    if (band === 'hard') {
+      rate = 80; sodium = '500–700'; fluid = '600–800';
+      why.push(`<b>CHO rate: 80 g/h (IF ${ifDisplay} — intensity bump).</b> Standard duration ladder: 60 g/h for 2–2.5h (Burke 2011). At IF &gt;0.80, glycogen depletion is accelerated — Hawley & Leckey 2015: CHO oxidation rate at race intensity can exceed 3 g/min from endogenous stores. Bumped one tier. Multi-transportable CHO required (2:1 glu:fru) — above 60 g/h, SGLT1 alone saturates at ~1.0–1.1 g/min (Jeukendrup 2014).`);
+    } else if (band === 'easy') {
+      rate = 30; sodium = '300–500'; fluid = '400–750';
+      trainLow = true;
+      why.push(`<b>CHO rate: 30 g/h (IF ${ifDisplay}).</b> At low intensity over 2h, fat oxidation covers a larger share of substrate demand. 30 g/h provides baseline exogenous CHO without excess. Single-source CHO is fine.`);
+      why.push(`<b>Train-low option:</b> At IF ${ifDisplay}, this qualifies as a Z2 endurance session. Stellingwerff/Impey 2018: performing this in a low-CHO state (water + electrolytes only) amplifies AMPK/PGC-1α signalling. Burke 2011 periodised model: "fuel for the work required" — if the goal is adaptation, not performance, low-CHO is the tool. Caveats: no more than 2–3 low-CHO sessions per week; don't train-low before a key session; monitor for under-fuelling signs.`);
+    } else {
+      rate = 60; sodium = '500–700'; fluid = '500–750';
+      why.push(`<b>CHO rate: 60 g/h (IF ${ifDisplay}).</b> Burke et al. 2011: 2–3h events → up to 60 g/h. This is the practical ceiling for single-source CHO — the intestinal SGLT1 glucose transporter saturates at ~1.0–1.1 g/min (Jeukendrup 2014). Above 60 g/h with single-source, unabsorbed CHO draws water into the gut lumen → GI distress. Consider multi-transportable (2:1 glu:fru) if gut tolerates it.`);
+    }
   } else if (hours < 3.5) {
-    rate = 80; sodium = '500–700'; fluid = '600–800';
-    why.push(`<b>CHO rate: 80 g/h.</b> Jeukendrup 2014 decision tree: events &gt;2.5h → 60–90 g/h with multi-transportable CHO required. Fructose is absorbed via the GLUT5 transporter (independent of SGLT1), raising total absorption capacity to ~1.5–1.75 g/min. Use 2:1 glucose:fructose ratio. Cermak & van Loon 2013 meta-analysis: CHO during exercise improves TT performance ~2%.`);
+    if (band === 'hard') {
+      rate = 90; sodium = '600–800'; fluid = '≥750';
+      why.push(`<b>CHO rate: 90 g/h (IF ${ifDisplay} — intensity bump).</b> Standard duration ladder: 80 g/h for 2.5–3.5h (Jeukendrup 2014). At IF &gt;0.80 over this duration, glycogen depletion is severe — Hawley & Leckey 2015: sustained high-intensity work is CHO-dependent regardless of training status. Pushed to 90 g/h; consider 100+ if gut-trained. Multi-transportable CHO required (2:1 glu:fru).`);
+    } else if (band === 'easy') {
+      rate = 60; sodium = '500–700'; fluid = '500–750';
+      why.push(`<b>CHO rate: 60 g/h (IF ${ifDisplay}).</b> Even at low intensity, 2.5h+ duration means meaningful glycogen depletion. 60 g/h is the minimum responsible rate at this duration. Single-source CHO is acceptable at 60 g/h; multi-transportable preferred. Cermak & van Loon 2013: CHO during exercise improves endurance performance ~2%.`);
+    } else {
+      rate = 80; sodium = '500–700'; fluid = '600–800';
+      why.push(`<b>CHO rate: 80 g/h (IF ${ifDisplay}).</b> Jeukendrup 2014 decision tree: events &gt;2.5h → 60–90 g/h with multi-transportable CHO required. Fructose is absorbed via the GLUT5 transporter (independent of SGLT1), raising total absorption capacity to ~1.5–1.75 g/min. Use 2:1 glucose:fructose ratio. Cermak & van Loon 2013 meta-analysis: CHO during exercise improves TT performance ~2%.`);
+    }
   } else {
-    rate = 90; sodium = '600–800'; fluid = '≥750';
-    why.push(`<b>CHO rate: 90 g/h (push to 100–120 if gut-trained).</b> Jeukendrup 2014: gut-trained athletes can achieve absorption rates of 1.75 g/min (105 g/h) vs untrained ~1.1 g/min. Gut training is a 4–6 week protocol of progressively higher CHO on long rides — it upregulates SGLT1/GLUT5 transporters and speeds gastric emptying. Multi-transportable CHO required (2:1 glu:fru).`);
+    // > 3.5h
+    if (band === 'hard') {
+      rate = 90; sodium = '600–800'; fluid = '≥750';
+      why.push(`<b>CHO rate: 90+ g/h — push to 100–120 if gut-trained (IF ${ifDisplay}).</b> At IF &gt;0.80 over 3.5h+, this is maximum substrate demand. Jeukendrup 2014: gut-trained athletes can achieve absorption rates of 1.75 g/min (105 g/h) vs untrained ~1.1 g/min. Multi-transportable CHO required (2:1 glu:fru). Hawley & Leckey 2015: at this intensity and duration, glycogen is the rate-limiting factor — maximise exogenous supply.`);
+    } else if (band === 'easy') {
+      rate = 80; sodium = '500–700'; fluid = '600–800';
+      why.push(`<b>CHO rate: 80 g/h (IF ${ifDisplay}).</b> Long easy ride — fat oxidation contributes significantly below the crossover point (Hawley & Leckey 2015), but at 3.5h+ even low-intensity work depletes glycogen substantially. 80 g/h is the responsible floor. Multi-transportable CHO required (2:1 glu:fru). Burke 2011: 8–12 g/kg/d for very high volume training.`);
+    } else {
+      rate = 90; sodium = '600–800'; fluid = '≥750';
+      why.push(`<b>CHO rate: 90 g/h (push to 100–120 if gut-trained) (IF ${ifDisplay}).</b> Jeukendrup 2014: gut-trained athletes can achieve absorption rates of 1.75 g/min (105 g/h) vs untrained ~1.1 g/min. Gut training is a 4–6 week protocol of progressively higher CHO on long rides — it upregulates SGLT1/GLUT5 transporters and speeds gastric emptying. Multi-transportable CHO required (2:1 glu:fru).`);
+    }
   }
 
   why.push(`<b>Sodium: ${sodium} mg/L.</b> Sawka 2007 ACSM position stand: 300–700 mg/L for events &gt;2h. Replaces sweat sodium losses (typical sweat [Na+] = 20–80 mmol/L). Prevents exercise-associated hyponatraemia (EAH) and aids fluid absorption.`);
@@ -488,7 +583,7 @@ function generateIntraFuel(durationSec, weight) {
   const fuelingHours = Math.max(0, hours - 0.5);
   const total = Math.round(rate * fuelingHours);
 
-  return { rate, total, sodium: `${sodium} mg/L`, fluid: `${fluid} ml/h`, why };
+  return { rate, total, sodium: `${sodium} mg/L`, fluid: `${fluid} ml/h`, trainLow, why };
 }
 
 function generatePostFuel(durationSec, weight, intensityFactor) {
@@ -633,8 +728,24 @@ function renderPlan(data) {
       rideKcal = 0; avgWatts = 0; durationSec = 0; source = 'none';
     }
 
+    // Compute NP-based IF for fueling matrix
+    // For actuals: use real IF from ICU if available
+    // For planned/estimated: estimate NP from avg power × VI, then IF = estimatedNP / FTP
+    let fuelingIF;
+    if (hasActual && acts.icu_intensity) {
+      fuelingIF = acts.icu_intensity;
+    } else if (hasActual && avgWatts > 0) {
+      // Actual ride but no IF — estimate using VI
+      fuelingIF = (avgWatts * (settings.variabilityIndex || 1.18)) / settings.ftp;
+    } else if (avgWatts > 0) {
+      // Planned/estimated: avgWatts is the planned avg power
+      fuelingIF = (avgWatts * (settings.variabilityIndex || 1.18)) / settings.ftp;
+    } else {
+      fuelingIF = classified.intensityFactor;
+    }
+
     const macros = computeDayMacros(rideKcal, durationSec, settings);
-    days.push({ date, classified, rideKcal, avgWatts, durationSec, source, macros, hasActual, evts, acts });
+    days.push({ date, classified, rideKcal, avgWatts, durationSec, source, macros, hasActual, evts, acts, fuelingIF });
   }
 
   let totalHours = days.reduce((s, d) => s + d.durationSec / 3600, 0);
@@ -661,9 +772,9 @@ function renderPlan(data) {
 
   html += `<div class="calib">
     <b>Auto-generated from Intervals.icu.</b> Each ride is costed: <code>ride_kcal = avg_power × duration_s ÷ 1000</code>.
-    Completed rides use actual data; upcoming rides use planned workouts. Deficit target: ~${settings.deficitPerDay} kcal/day.
-    Carbs are the adjustment lever — protein (${settings.proteinFloor}g) and fat stay fixed.
-    Fuel protocols follow Jeukendrup 2014 / Burke 2011 / Thomas 2016 ACSM.
+    Fueling rate uses a 2D matrix (duration × intensity). For planned rides, IF is estimated as <code>avg_power × VI(${settings.variabilityIndex}) ÷ FTP</code>; for completed rides, real IF from ICU is used when available.
+    Deficit target: ~${settings.deficitPerDay} kcal/day. Carbs are the adjustment lever — protein (${settings.proteinFloor}g) and fat stay fixed.
+    Fuel protocols follow Jeukendrup 2014 / Burke 2011 / Hawley & Leckey 2015 / Stellingwerff & Impey 2018.
   </div>`;
 
   html += `<div class="refresh-bar">
@@ -726,9 +837,9 @@ function renderPlan(data) {
         html += `</div>`;
       }
 
-      const intra = generateIntraFuel(day.durationSec, settings.weight);
+      const intra = generateIntraFuel(day.durationSec, settings.weight, day.fuelingIF, day.classified.type);
       html += `<div class="fuel-block intra">`;
-      html += `<p class="fuel-label">During workout${intra.rate > 0 ? ' · ' + intra.rate + ' g/h target' : ''}</p>`;
+      html += `<p class="fuel-label">During workout${intra.rate > 0 ? ' · ' + intra.rate + ' g/h target' : ''}${day.fuelingIF ? ' · IF ' + day.fuelingIF.toFixed(2) : ''}</p>`;
       if (intra.total > 0) {
         html += `<p class="fuel-macro">~${intra.total} g CHO total · ${intra.sodium} sodium · ${intra.fluid} fluid</p>`;
       }
@@ -787,6 +898,7 @@ function renderSettings() {
     <div class="setting-field"><label>Weight (kg)</label><input type="number" id="s-weight" value="${s.weight}" step="0.5"><span class="hint">Working bodyweight</span></div>
     <div class="setting-field"><label>BMR (kcal/day)</label><input type="number" id="s-bmr" value="${s.bmr}" step="5"><span class="hint">Basal metabolic rate</span></div>
     <div class="setting-field"><label>NEAT multiplier</label><input type="number" id="s-neat" value="${s.neatMultiplier}" step="0.05" min="1.0" max="1.6"><span class="hint">Off-bike activity factor (1.10–1.40)</span></div>
+    <div class="setting-field"><label>Variability Index</label><input type="number" id="s-vi" value="${s.variabilityIndex}" step="0.01" min="1.0" max="1.50"><span class="hint">NP/AP ratio — typical: 1.05 flat/steady, 1.15–1.25 hilly/variable. Check your last 20 rides in ICU.</span></div>
     <div class="setting-field" style="grid-column:1/-1">
       <label>Daily deficit strategy</label>
       <select id="s-deficit-preset" onchange="onDeficitPresetChange()">
@@ -806,7 +918,8 @@ function renderSettings() {
   html += `<div class="derived">
     <b>Derived values:</b><br>
     Off-bike baseline = BMR × NEAT = ${fmt(s.bmr)} × ${s.neatMultiplier} = <b>${fmt(baseline)} kcal/day</b><br>
-    TDEE on ride days = ${fmt(baseline)} + ride_kcal<br>
+    TDEE on ride days = ${fmt(baseline)} + ride_kcal (based on avg power)<br>
+    Fueling IF (planned rides) = avg_power × VI ÷ FTP = avg_power × ${s.variabilityIndex} ÷ ${s.ftp}<br>
     Protein per kg = ${(s.proteinFloor / s.weight).toFixed(2)} g/kg/d
   </div>`;
 
@@ -856,6 +969,7 @@ function saveSettingsFromForm() {
     weight: parseFloat(document.getElementById('s-weight').value) || DEFAULTS.weight,
     bmr: parseInt(document.getElementById('s-bmr').value) || DEFAULTS.bmr,
     neatMultiplier: parseFloat(document.getElementById('s-neat').value) || DEFAULTS.neatMultiplier,
+    variabilityIndex: parseFloat(document.getElementById('s-vi').value) || DEFAULTS.variabilityIndex,
     deficitPerDay: parseInt(document.getElementById('s-deficit').value) || DEFAULTS.deficitPerDay,
     proteinFloor: parseInt(document.getElementById('s-protein').value) || DEFAULTS.proteinFloor,
     proteinLongDay: parseInt(document.getElementById('s-proteinLong').value) || DEFAULTS.proteinLongDay,
