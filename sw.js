@@ -1,4 +1,4 @@
-const CACHE = 'fuel-v6';
+const CACHE = 'fuel-v7';
 const SHELL = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

@@ -253,6 +253,7 @@ const DEFAULTS = {
   proteinFloor: 160,
   proteinLongDay: 165,
   variabilityIndex: 1.18,
+  preWorkoutMins: 60,
 };
 
 function loadSettings() {
@@ -476,73 +477,103 @@ function computeDayMacros(rideKcal, durationSec, settings) {
 //  + Thomas 2016 ACSM + Sawka 2007 hydration
 // ────────────────────────────────────────────────────────────────
 
-function generatePreFuel(durationSec, weight, intensityFactor) {
+function generatePreFuel(durationSec, weight, intensityFactor, preWorkoutMins) {
   const hours = durationSec / 3600;
   if (hours < 0.75) return null;
 
   const band = getIntensityBand(intensityFactor || 0);
   const ifDisplay = intensityFactor ? intensityFactor.toFixed(2) : '?';
+  const leadMins = preWorkoutMins || 60;
+  const leadHrs = leadMins / 60;
+  const leadLabel = leadMins >= 60 ? `${leadHrs}h before` : `${leadMins} min before`;
 
   // ── Train-low option: easy sessions → protein+fat only ────
   if (band === 'easy' && hours < 2.5) {
+    const tlProtein = leadMins >= 90 ? 25 : 20;
+    const tlFat = leadMins >= 90 ? 15 : 10;
     return {
-      carbs: 0, protein: 20, fat: 10, timing: '60–90 min before (train-low)',
+      carbs: 0, protein: tlProtein, fat: tlFat, timing: `${leadLabel} (train-low)`,
       carbGkg: '0', trainLow: true,
       why: [
-        `<b>Train-low pre-meal (IF ${ifDisplay}).</b> Stellingwerff/Impey 2018: commencing low-intensity sessions (IF &lt;0.65) with reduced muscle glycogen amplifies AMPK/PGC-1α signalling for mitochondrial biogenesis. Burke 2011 periodised model: "fuel for the work required" — adaptation sessions don't need topped-up glycogen.`,
-        `<b>Protein 20g + fat 10g:</b> Provides satiety and amino acid availability without spiking insulin or refilling glycogen. Phillips & van Loon 2011: pre-exercise protein supports MPS regardless of CHO availability.`,
-        `<b>Examples:</b> 2 eggs scrambled, small handful of almonds, Greek yogurt (no honey), protein shake with nut butter. Avoid: bread, banana, oats, anything high-GI.`,
+        `<b>Train-low pre-meal (IF ${ifDisplay}, ${leadLabel}).</b> Stellingwerff/Impey 2018: commencing low-intensity sessions (IF &lt;0.65) with reduced muscle glycogen amplifies AMPK/PGC-1α signalling for mitochondrial biogenesis. Burke 2011 periodised model: "fuel for the work required" — adaptation sessions don't need topped-up glycogen.`,
+        `<b>Protein ${tlProtein}g + fat ${tlFat}g:</b> Provides satiety and amino acid availability without spiking insulin or refilling glycogen. Phillips & van Loon 2011: pre-exercise protein supports MPS regardless of CHO availability.${leadMins >= 90 ? ' With ' + leadLabel + ' lead time, slightly larger portion is fine — ample time for gastric clearance.' : ''}`,
+        leadMins >= 120
+          ? `<b>Examples (${leadLabel} window):</b> Omelette with cheese, avocado toast (no honey), Greek yogurt with nuts, protein shake with nut butter + berries (low sugar).`
+          : leadMins >= 60
+            ? `<b>Examples (${leadLabel} window):</b> 2 eggs scrambled, small handful of almonds, Greek yogurt (no honey), protein shake with nut butter.`
+            : `<b>Examples (${leadLabel} window):</b> Small protein shake, handful of nuts, slice of cheese. Keep it minimal — limited digestion time.`,
         `<b>Caveats:</b> Only if (1) you haven't done &gt;2 train-low sessions this week, (2) you slept well, (3) you're not in a heavy deficit. If in doubt, fuel normally with carbs.`,
       ]
     };
   }
 
   // ── 2D pre-fuel matrix: duration × intensity ──────────────
+  // CHO dose scales with BOTH ride demand and available lead time
   //
-  //  Duration     | Easy (IF<0.65)   | Moderate (0.65-0.80) | Hard (IF>0.80)
-  //  <1.5h        | 0.5 g/kg         | 0.5 g/kg             | 1.0 g/kg
-  //  1.5–2.5h     | 0.5 g/kg         | 0.8 g/kg             | 1.5 g/kg
-  //  2.5–3.5h     | 0.8 g/kg         | 1.0 g/kg             | 2.0 g/kg
-  //  >3.5h        | 1.0 g/kg         | 1.2 g/kg             | 2.5 g/kg
+  // Lead time scaling (Thomas 2016: 1–4 g/kg over 1–4h):
+  //   30 min  → ×0.5  (small, fast-absorbing only)
+  //   60 min  → ×0.75
+  //   90 min  → ×1.0  (baseline)
+  //   120 min → ×1.25
+  //   180 min → ×1.5  (full pre-load meal)
 
-  let carbGkg;
+  const leadScale = leadMins <= 30 ? 0.5
+    : leadMins <= 60 ? 0.75
+    : leadMins <= 90 ? 1.0
+    : leadMins <= 120 ? 1.25
+    : 1.5;
+
+  // Base CHO g/kg from duration × intensity matrix
+  let baseCarbGkg;
   if (hours < 1.5) {
-    carbGkg = band === 'hard' ? 1.0 : 0.5;
+    baseCarbGkg = band === 'hard' ? 1.0 : 0.5;
   } else if (hours < 2.5) {
-    carbGkg = band === 'hard' ? 1.5 : band === 'moderate' ? 0.8 : 0.5;
+    baseCarbGkg = band === 'hard' ? 1.5 : band === 'moderate' ? 0.8 : 0.5;
   } else if (hours < 3.5) {
-    carbGkg = band === 'hard' ? 2.0 : band === 'moderate' ? 1.0 : 0.8;
+    baseCarbGkg = band === 'hard' ? 2.0 : band === 'moderate' ? 1.0 : 0.8;
   } else {
-    carbGkg = band === 'hard' ? 2.5 : band === 'moderate' ? 1.2 : 1.0;
+    baseCarbGkg = band === 'hard' ? 2.5 : band === 'moderate' ? 1.2 : 1.0;
   }
 
+  // Scale by lead time
+  const carbGkg = Math.round(baseCarbGkg * leadScale * 10) / 10;
   const carbs = Math.round(carbGkg * weight);
-  let protein, fat, timing;
 
-  if (band === 'hard') {
-    // Hard: bigger meal, earlier timing to allow digestion
-    protein = 10;
-    fat = 5;
-    timing = hours >= 2.5 ? '2–3h before' : '60–90 min before';
+  // Protein & fat scale with available time (more time → can handle more)
+  let protein, fat;
+  if (leadMins >= 120) {
+    protein = band === 'hard' ? 15 : 15;
+    fat = band === 'hard' ? 10 : 10;
+  } else if (leadMins >= 60) {
+    protein = band === 'hard' ? 10 : 10;
+    fat = band === 'hard' ? 5 : 5;
   } else {
+    // 30 min — keep protein/fat minimal
     protein = 5;
     fat = 0;
-    timing = '30 min before';
   }
 
   const why = [];
 
   if (band === 'hard') {
-    why.push(`<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g) — intensity-boosted (IF ${ifDisplay}).</b> Burke 2011 & Thomas 2016: pre-exercise CHO should top off liver glycogen and augment muscle glycogen when high depletion is expected. At IF &gt;0.80, CHO oxidation rate is maximal (Hawley & Leckey 2015) — arriving with full stores is critical. Dose bumped from standard ${hours < 1.5 ? '0.5' : hours < 2.5 ? '0.8' : hours < 3.5 ? '1.0' : '1.2'} to ${carbGkg.toFixed(1)} g/kg.`);
-    why.push(`<b>Timing ${timing}:</b> Larger CHO bolus (${carbs}g) needs more gastric emptying time to avoid GI distress at high intensity. Burke 2011: "the higher the intensity, the more time needed for gastric clearance." Eat low-fibre, low-fat, moderate-GI foods.`);
-    why.push(`<b>Examples:</b> Rice + honey, white toast + jam + banana, porridge with syrup (if 2h+ before), energy bar + banana, rice cakes. At ${carbGkg.toFixed(1)} g/kg you may need to combine solid + liquid CHO (e.g. food + sports drink).`);
+    why.push(`<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g) — intensity-boosted (IF ${ifDisplay}), scaled for ${leadLabel} lead time (×${leadScale}).</b> Burke 2011 & Thomas 2016: pre-exercise CHO should top off liver glycogen and augment muscle glycogen when high depletion is expected. At IF &gt;0.80, CHO oxidation rate is maximal (Hawley & Leckey 2015) — arriving with full stores is critical. Base dose ${baseCarbGkg.toFixed(1)} g/kg × ${leadScale} lead-time factor = ${carbGkg.toFixed(1)} g/kg.`);
   } else {
-    why.push(`<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g) (IF ${ifDisplay}).</b> Thomas 2016 ACSM recommends 1–4 g/kg 1–4h pre-exercise. At 30 min, dose is scaled to ${carbGkg.toFixed(1)} g/kg to allow gastric emptying before effort. Focus on quick-digesting CHO (glucose, sucrose, maltodextrin) — avoid fructose-only sources which empty slower (Jeukendrup & Gleeson, Sport Nutrition Ch. 8).`);
-    why.push(`<b>Protein ~5g, fat 0g:</b> Both slow gastric emptying. At 30 min pre, keep minimal to reduce GI distress risk (Burke et al. 2011: pre-event meal should be "low fat, low fibre, moderate protein" — but at 30 min the window is too short for significant protein).`);
-    why.push(`<b>Examples:</b> 1–2 gels, banana + honey, white bread + jam, rice cake + honey, dates. Avoid: oats, eggs, yogurt, anything with fat or fibre.`);
+    why.push(`<b>Carbs ${carbGkg.toFixed(1)} g/kg (${carbs}g) (IF ${ifDisplay}), scaled for ${leadLabel} lead time (×${leadScale}).</b> Thomas 2016 ACSM: 1–4 g/kg over 1–4h pre-exercise. Base dose ${baseCarbGkg.toFixed(1)} g/kg × ${leadScale} lead-time factor = ${carbGkg.toFixed(1)} g/kg.`);
   }
 
-  return { carbs, protein, fat, timing, carbGkg: carbGkg.toFixed(1), trainLow: false, why };
+  // Timing-specific food advice
+  if (leadMins >= 120) {
+    why.push(`<b>Protein ${protein}g, fat ${fat}g:</b> With ${leadLabel}, there's enough time for gastric emptying of a mixed meal. Moderate protein supports pre-exercise amino acid availability (Phillips & van Loon 2011). Small amount of fat is OK — Burke 2011: "low fat, low fibre" but not zero.`);
+    why.push(`<b>Examples (${leadLabel} window):</b> Rice + chicken + honey, pasta with light sauce, porridge with banana + honey, toast with eggs + jam, rice bowl with protein. A proper meal — just keep fibre low.`);
+  } else if (leadMins >= 60) {
+    why.push(`<b>Protein ${protein}g, fat ${fat}g:</b> At ${leadLabel}, keep protein moderate and fat low. Burke 2011: "low fat, low fibre, moderate protein." Enough time for a light snack but not a full meal.`);
+    why.push(`<b>Examples (${leadLabel} window):</b> Banana + honey + white toast, rice cake with jam, energy bar + banana, white bread with jam + small protein shake.`);
+  } else {
+    why.push(`<b>Protein ~5g, fat 0g:</b> At ${leadLabel}, both slow gastric emptying. Keep minimal to reduce GI distress risk — Burke et al. 2011: the window is too short for significant protein or fat.`);
+    why.push(`<b>Examples (${leadLabel} window):</b> 1–2 gels, banana + honey, dates, white bread + jam, sports drink. Quick-digesting CHO only — avoid anything with fat, fibre, or complex protein.`);
+  }
+
+  return { carbs, protein, fat, timing: leadLabel, carbGkg: carbGkg.toFixed(1), trainLow: false, why };
 }
 // ────────────────────────────────────────────────────────────────
 //  2D FUELING MATRIX — Duration × Intensity (Jeukendrup 2014 +
@@ -932,7 +963,7 @@ function renderPlan(data) {
     }
 
     if (hours >= 0.75) {
-      const pre = generatePreFuel(day.durationSec, settings.weight, day.fuelingIF);
+      const pre = generatePreFuel(day.durationSec, settings.weight, day.fuelingIF, settings.preWorkoutMins);
       if (pre) {
         html += `<div class="fuel-block pre${pre.trainLow ? ' train-low' : ''}">`;
         html += `<p class="fuel-label">Pre-workout · ${pre.timing}${day.fuelingIF ? ' · IF ' + day.fuelingIF.toFixed(2) : ''}</p>`;
@@ -1003,6 +1034,13 @@ function renderSettings() {
     <div class="setting-field"><label>BMR (kcal/day)</label><input type="number" id="s-bmr" value="${s.bmr}" step="5"><span class="hint">Basal metabolic rate</span></div>
     <div class="setting-field"><label>NEAT multiplier</label><input type="number" id="s-neat" value="${s.neatMultiplier}" step="0.05" min="1.0" max="1.6"><span class="hint">Off-bike activity factor (1.10–1.40)</span></div>
     <div class="setting-field"><label>Variability Index</label><input type="number" id="s-vi" value="${s.variabilityIndex}" step="0.01" min="1.0" max="1.50"><span class="hint">NP/AP ratio — typical: 1.05 flat/steady, 1.15–1.25 hilly/variable. Check your last 20 rides in ICU.</span></div>
+    <div class="setting-field"><label>Pre-workout lead time</label><select id="s-pretime">
+      <option value="30"${s.preWorkoutMins == 30 ? ' selected' : ''}>30 min — gels/simple sugar only</option>
+      <option value="60"${s.preWorkoutMins == 60 ? ' selected' : ''}>1 hour — light snack</option>
+      <option value="90"${s.preWorkoutMins == 90 ? ' selected' : ''}>1.5 hours — small meal</option>
+      <option value="120"${s.preWorkoutMins == 120 ? ' selected' : ''}>2 hours — full meal</option>
+      <option value="180"${s.preWorkoutMins == 180 ? ' selected' : ''}>3 hours — big pre-load meal</option>
+    </select><span class="hint">How much time you typically have before training. Adjusts food type, portion size, and composition.</span></div>
     <div class="setting-field" style="grid-column:1/-1">
       <label>Daily deficit strategy</label>
       <select id="s-deficit-preset" onchange="onDeficitPresetChange()">
@@ -1074,6 +1112,7 @@ function saveSettingsFromForm() {
     bmr: parseInt(document.getElementById('s-bmr').value) || DEFAULTS.bmr,
     neatMultiplier: parseFloat(document.getElementById('s-neat').value) || DEFAULTS.neatMultiplier,
     variabilityIndex: parseFloat(document.getElementById('s-vi').value) || DEFAULTS.variabilityIndex,
+    preWorkoutMins: parseInt(document.getElementById('s-pretime').value) || DEFAULTS.preWorkoutMins,
     deficitPerDay: parseInt(document.getElementById('s-deficit').value) || DEFAULTS.deficitPerDay,
     proteinFloor: parseInt(document.getElementById('s-protein').value) || DEFAULTS.proteinFloor,
     proteinLongDay: parseInt(document.getElementById('s-proteinLong').value) || DEFAULTS.proteinLongDay,
