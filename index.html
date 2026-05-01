@@ -276,7 +276,7 @@ function renderPlan(plan) {
   // Calibration
   html += `
       <div class="calib">
-        <b>Power-based costing.</b> Each ride is individually costed: <code>ride_kcal ≈ avg_power_W × duration_s ÷ 1000</code>. Completed sessions use TP <em>Energy</em>; planned sessions use estimated avg power = target_IF × FTP (${m.ftp} W). Daily TDEE = ${fmt(m.offBikeBaseline)} + ride_kcal. Adjustable days hit ~${m.deficitPerDay} kcal/day deficit → ~0.25 kg/wk fat loss.
+        <b>Power-based costing.</b> Each ride is individually costed: <code>ride_kcal ≈ avg_power_W × duration_s ÷ 1000</code>. Uses <em>average</em> power (not normalized). When actual data arrives from Intervals.icu, macros are recalculated: TDEE updates, same ~${m.deficitPerDay} kcal deficit is maintained, and the difference is pulled from <b>carbs only</b> — protein floor (${m.proteinFloor}g) and fat stay fixed.
       </div>`;
 
   // Changelog
@@ -402,6 +402,37 @@ async function loadPlan() {
   }
 }
 
+// ─── Macro recalculation ───
+// When actual ride kcal differs from estimate, recalculate intake.
+// Logic (grounded in periodized nutrition research — Stellingwerff, Burke, Jeukendrup):
+//   - Protein stays at floor (structural, non-negotiable)
+//   - Fat stays stable (hormonal health, satiety)
+//   - Carbs are the adjustment lever
+//   - Same deficit target is maintained
+function recalcMacros(originalMacros, originalRideKcal, actualRideKcal, meta) {
+  const baseline = meta.offBikeBaseline;
+  const deficit = meta.deficitPerDay || 270;
+  const protein = originalMacros.protein; // stays fixed
+  const fat = originalMacros.fat;         // stays fixed
+
+  // New TDEE from actual ride data
+  const newTdee = baseline + actualRideKcal;
+  const newEat = newTdee - deficit;
+
+  // Calories from protein + fat are fixed
+  const proteinKcal = protein * 4;
+  const fatKcal = fat * 9;
+  const carbKcal = Math.max(0, newEat - proteinKcal - fatKcal);
+  const carbs = Math.round(carbKcal / 4);
+
+  return {
+    kcal: Math.round(newEat),
+    carbs: carbs,
+    protein: protein,
+    fat: fat
+  };
+}
+
 // ─── Intervals.icu Integration ───
 async function refreshFromIntervals() {
   const btn = document.getElementById('icu-btn');
@@ -416,12 +447,10 @@ async function refreshFromIntervals() {
     const plan = window._plan;
     if (!plan || !plan.days || !plan.days.length) throw new Error('No plan loaded.');
 
-    // Get date range from plan
     const dates = plan.days.map(d => d.date).sort();
     const oldest = dates[0];
     const newest = dates[dates.length - 1];
 
-    // Call our serverless proxy
     const resp = await fetch(`/api/intervals?oldest=${oldest}&newest=${newest}`);
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -429,29 +458,77 @@ async function refreshFromIntervals() {
     }
     const byDate = await resp.json();
 
-    // Patch each day card with actual data
     let updated = 0;
-    const baseline = plan.meta.offBikeBaseline;
+    const meta = plan.meta;
+    const baseline = meta.offBikeBaseline;
 
     document.querySelectorAll('.day[data-date]').forEach(card => {
       const date = card.dataset.date;
       const data = byDate[date];
       if (!data || !data.totalEnergy) return;
 
+      const dayData = plan.days.find(d => d.date === date);
+      if (!dayData) return;
+
+      const actualRideKcal = data.totalEnergy;
+      const actualTdee = baseline + actualRideKcal;
+
+      // Compute what the original estimated ride kcal was
+      let originalRideKcal = 0;
+      if (dayData.power) {
+        if (dayData.power.source === 'estimate' && dayData.power.intensityFactor) {
+          const estW = Math.round(dayData.power.intensityFactor * meta.ftp);
+          originalRideKcal = Math.round(estW * dayData.power.durationSec / 1000);
+        } else if (dayData.power.rideKcal) {
+          originalRideKcal = dayData.power.rideKcal;
+        }
+      }
+
+      // Recalculate macros
+      const newMacros = recalcMacros(dayData.macros, originalRideKcal, actualRideKcal, meta);
+      const kcalDiff = newMacros.kcal - dayData.macros.kcal;
+      const carbDiff = newMacros.carbs - dayData.macros.carbs;
+
       // Update power line
       const pl = card.querySelector('.power-line');
       if (pl) {
-        const ride = data.totalEnergy;
-        const tdee = baseline + ride;
-        const dayData = plan.days.find(d => d.date === date);
-        const eat = dayData ? dayData.macros.kcal : null;
-        let line = `Intervals.icu: ${data.avgWatts ? fmt(data.avgWatts) + ' W avg × ' : ''}${fmt(data.totalTime)} s ÷ 1000 = <b>${fmt(ride)} kcal ride</b> · TDEE ${fmt(tdee)}`;
-        if (eat) line += ` · Eat ${fmt(eat)} (~${fmt(tdee - eat)} kcal deficit)`;
+        let line = `Intervals.icu: ${data.avgWatts ? fmt(data.avgWatts) + ' W avg × ' : ''}${fmt(data.totalTime)} s ÷ 1000 = <b>${fmt(actualRideKcal)} kcal ride</b> · TDEE ${fmt(actualTdee)} · Eat ${fmt(newMacros.kcal)} (~${fmt(meta.deficitPerDay || 270)} kcal deficit)`;
         pl.innerHTML = line;
         pl.classList.add('actual');
       }
 
-      // Add actual pill if not present
+      // Update macro cards
+      const macroCards = card.querySelectorAll('.macro');
+      if (macroCards.length >= 4) {
+        macroCards[0].querySelector('.m-val').textContent = fmt(newMacros.kcal);
+        const carbVal = macroCards[1].querySelector('.m-val');
+        carbVal.innerHTML = `${fmt(newMacros.carbs)}<span class="m-unit"> g</span>`;
+        // Highlight carb change if significant
+        if (Math.abs(carbDiff) >= 10) {
+          carbVal.style.color = carbDiff < 0 ? 'var(--hard-text)' : 'var(--success-text)';
+        }
+        macroCards[2].querySelector('.m-val').innerHTML = `${fmt(newMacros.protein)}<span class="m-unit"> g</span>`;
+        macroCards[3].querySelector('.m-val').innerHTML = `${fmt(newMacros.fat)}<span class="m-unit"> g</span>`;
+      }
+
+      // Add adjustment note if meaningful change
+      if (Math.abs(kcalDiff) >= 50) {
+        const existingAdj = card.querySelector('.adj-note');
+        if (!existingAdj) {
+          const note = document.createElement('div');
+          note.className = 'note adj-note';
+          note.innerHTML = `<b>Adjusted from actual:</b> ride was ${fmt(actualRideKcal)} kcal vs ${fmt(originalRideKcal)} kcal estimated (${kcalDiff > 0 ? '+' : ''}${fmt(kcalDiff)} kcal). Carbs ${carbDiff > 0 ? '+' : ''}${fmt(carbDiff)}g, protein and fat unchanged.`;
+          // Insert after macro row
+          const macroRow = card.querySelector('.macro-row');
+          if (macroRow && macroRow.nextSibling) {
+            macroRow.parentNode.insertBefore(note, macroRow.nextSibling);
+          } else {
+            card.appendChild(note);
+          }
+        }
+      }
+
+      // Add actual pill
       const head = card.querySelector('.day-head');
       if (head && !card.querySelector('.actual-pill')) {
         const pill = document.createElement('span');
@@ -467,7 +544,7 @@ async function refreshFromIntervals() {
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
     if (updated > 0) {
-      status.textContent = `Updated ${hh}:${mm} · ${updated} day${updated === 1 ? '' : 's'} patched from Intervals.icu.`;
+      status.textContent = `Updated ${hh}:${mm} · ${updated} day${updated === 1 ? '' : 's'} patched from Intervals.icu. Macros recalculated.`;
       status.classList.add('success');
     } else {
       status.textContent = `Refreshed ${hh}:${mm} · no matching rides found for this week.`;

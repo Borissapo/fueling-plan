@@ -84,7 +84,7 @@ export default async function handler(req, res) {
         date: date,
         movingTime: act.moving_time || 0,         // seconds
         elapsedTime: act.elapsed_time || 0,        // seconds
-        avgWatts: act.average_watts || act.icu_weighted_avg_watts || null,
+        avgWatts: act.average_watts || null, // Use average power, NOT normalized (icu_weighted_avg_watts)
         maxWatts: act.max_watts || null,
         energy: act.joules ? Math.round(act.joules / 4184) : null, // joules → kcal
         icu_training_load: act.icu_training_load || null,
