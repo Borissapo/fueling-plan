@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Weekly Fueling Plan</title>
+<title>Fuel Plan</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1F3A5F">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -37,6 +37,8 @@
   --easy-text: #0C447C;
   --hard-bg: #FAECE7;
   --hard-text: #712B13;
+  --long-bg: #E8F5E9;
+  --long-text: #1B5E20;
   --past-bg: #ECEAE3;
   --past-text: #6E6E68;
   --success-bg: #E6F4EA;
@@ -45,6 +47,15 @@
   --error-text: #851515;
   --r-md: 8px;
   --r-lg: 12px;
+  --pre-bg: #E3F2FD;
+  --pre-text: #0D47A1;
+  --pre-strong: #0A3A7E;
+  --intra-bg: #FAEEDA;
+  --intra-text: #633806;
+  --intra-strong: #412402;
+  --post-bg: #E8F5E9;
+  --post-text: #2E7D32;
+  --post-strong: #1B5E20;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -73,12 +84,23 @@
     --easy-text: #7BB8E8;
     --hard-bg: #3A1E14;
     --hard-text: #E89878;
+    --long-bg: #1A3322;
+    --long-text: #68C080;
     --past-bg: #252523;
     --past-text: #888883;
     --success-bg: #1A3322;
     --success-text: #68C080;
     --error-bg: #3A1818;
     --error-text: #E88888;
+    --pre-bg: #1A2E42;
+    --pre-text: #7BB8E8;
+    --pre-strong: #A0D0F0;
+    --intra-bg: #3A2A10;
+    --intra-text: #E8C882;
+    --intra-strong: #F0D8A0;
+    --post-bg: #1A3322;
+    --post-text: #68C080;
+    --post-strong: #90E0A0;
   }
 }
 * { box-sizing: border-box; }
@@ -88,7 +110,7 @@ h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
 h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 .subtle { color: var(--text-muted); font-size: 13px; }
 .loading-msg { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 16px; }
-.error-msg { text-align: center; padding: 60px 20px; color: var(--error-text); background: var(--error-bg); border-radius: var(--r-lg); margin: 20px; }
+.error-msg { text-align: center; padding: 40px 20px; color: var(--error-text); background: var(--error-bg); border-radius: var(--r-lg); margin: 20px 0; font-size: 14px; }
 
 /* Metrics */
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 16px 0 0; }
@@ -102,13 +124,19 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 .calib b { font-weight: 500; color: var(--text); }
 .calib code { background: rgba(128,128,128,0.15); padding: 1px 6px; border-radius: 4px; font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 
-/* Changelog */
-.changed { background: var(--success-bg); border-radius: var(--r-md); padding: 12px 14px; margin: 12px 0 0; font-size: 13px; color: var(--success-text); }
-.changed b { font-weight: 600; }
-.changed ul { margin: 6px 0 0; padding-left: 18px; }
-.changed li { margin: 3px 0; }
+/* Navigation */
+.nav-bar { display: flex; gap: 8px; margin: 16px 0 0; }
+.nav-btn { appearance: none; background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); padding: 8px 14px; border-radius: var(--r-md); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.12s; }
+.nav-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-/* TP refresh */
+/* Week nav */
+.week-nav { display: flex; align-items: center; gap: 12px; margin: 16px 0 0; }
+.week-nav button { appearance: none; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); width: 36px; height: 36px; border-radius: var(--r-md); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.12s; }
+.week-nav button:hover { background: var(--accent); color: #fff; }
+.week-label { font-size: 15px; font-weight: 500; flex: 1; text-align: center; }
+
+/* Refresh bar */
 .refresh-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r-md); padding: 10px 14px; margin: 16px 0 0; }
 .refresh-btn { appearance: none; background: var(--accent); color: #fff; border: 0; padding: 8px 14px; border-radius: var(--r-md); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.12s, transform 0.05s; }
 .refresh-btn:hover { background: var(--accent-hover); }
@@ -130,13 +158,12 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 .day-date { font-size: 13px; color: var(--text-muted); }
 .pill { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.02em; }
 .pill.today-pill { background: var(--accent); color: #fff; }
-.pill.past-pill { background: var(--past-text); color: #fff; }
-.pill.recal-pill { background: #B95E1F; color: #fff; }
 .pill.actual-pill { background: var(--success-bg); color: var(--success-text); }
 .badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.01em; }
 .badge.rest { background: var(--rest-bg); color: var(--rest-text); }
 .badge.easy { background: var(--easy-bg); color: var(--easy-text); }
 .badge.hard { background: var(--hard-bg); color: var(--hard-text); }
+.badge.long { background: var(--long-bg); color: var(--long-text); }
 .session { font-size: 14px; color: var(--text); margin: 0 0 10px; }
 .power-line { font-size: 13px; color: var(--info-text); background: var(--info-bg); padding: 6px 10px; border-radius: var(--r-md); margin: 0 0 10px; font-variant-numeric: tabular-nums; }
 .power-line.actual { background: var(--success-bg); color: var(--success-text); }
@@ -148,11 +175,18 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 .macro .m-val { font-size: 16px; font-weight: 600; margin: 0; line-height: 1.2; }
 .macro .m-unit { font-size: 11px; color: var(--text-muted); font-weight: 400; }
 
-/* Fuel */
-.fuel { background: var(--warm-bg); border-radius: var(--r-md); padding: 12px 14px; margin: 8px 0 12px; color: var(--warm-text); }
-.fuel-title { font-size: 12px; font-weight: 600; color: var(--warm-strong); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
-.fuel-row { font-size: 14px; line-height: 1.55; margin: 4px 0; }
-.fuel-row b { color: var(--warm-strong); font-weight: 500; }
+/* Fuel protocol blocks */
+.fuel-block { border-radius: var(--r-md); padding: 12px 14px; margin: 6px 0; }
+.fuel-block.pre { background: var(--pre-bg); color: var(--pre-text); }
+.fuel-block.intra { background: var(--intra-bg); color: var(--intra-text); }
+.fuel-block.post { background: var(--post-bg); color: var(--post-text); }
+.fuel-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px; }
+.fuel-block.pre .fuel-label { color: var(--pre-strong); }
+.fuel-block.intra .fuel-label { color: var(--intra-strong); }
+.fuel-block.post .fuel-label { color: var(--post-strong); }
+.fuel-macro { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+.fuel-detail { font-size: 13px; line-height: 1.5; margin: 2px 0; }
+.fuel-detail b { font-weight: 500; }
 
 /* Preload */
 .preload { background: var(--preload-bg); border-radius: var(--r-md); padding: 12px 14px; margin: 8px 0 0; color: var(--preload-text); border-left: 3px solid #D4A017; }
@@ -161,22 +195,31 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 .preload li { margin: 2px 0; }
 .preload b { color: var(--preload-strong); font-weight: 500; }
 
-/* Meals */
-.meals { font-size: 14px; line-height: 1.65; }
-.meals .lead { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 8px 0 4px; font-weight: 500; }
-.meals ul { margin: 0; padding-left: 18px; }
-.meals li { margin: 2px 0; }
-.meals b { font-weight: 500; }
-
 /* Note */
 .note { font-size: 13px; color: var(--text-muted); background: var(--surface-2); border-radius: var(--r-md); padding: 10px 12px; margin: 8px 0 0; }
 .note b { color: var(--text); font-weight: 500; }
 
+/* Settings panel */
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
+.plan-panel { display: none; }
+.plan-panel.active { display: block; }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.setting-field { display: flex; flex-direction: column; gap: 4px; }
+.setting-field label { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.setting-field input { appearance: none; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 10px 12px; font: inherit; font-size: 15px; color: var(--text); width: 100%; }
+.setting-field input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.setting-field .hint { font-size: 11px; color: var(--text-faint); }
+.settings-actions { display: flex; gap: 10px; margin: 16px 0; }
+.settings-actions button { appearance: none; border: 0; padding: 10px 20px; border-radius: var(--r-md); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-save { background: var(--accent); color: #fff; }
+.btn-save:hover { background: var(--accent-hover); }
+.btn-reset { background: var(--surface-2); color: var(--text-muted); }
+.derived { background: var(--info-bg); color: var(--info-text); border-radius: var(--r-md); padding: 12px 14px; margin: 12px 0; font-size: 14px; }
+.derived b { font-weight: 600; }
+
 /* Footer */
 .foot { margin-top: 24px; font-size: 13px; color: var(--text-muted); border-top: 0.5px solid var(--border); padding-top: 14px; }
-.foot b { color: var(--text); font-weight: 500; }
-.foot ul { margin: 6px 0 0; padding-left: 18px; }
-.foot li { margin: 3px 0; }
 
 /* Install prompt */
 .install-bar { display: none; background: var(--info-bg); color: var(--info-text); border-radius: var(--r-md); padding: 10px 14px; margin: 12px 0 0; font-size: 13px; cursor: pointer; text-align: center; font-weight: 500; }
@@ -185,139 +228,506 @@ h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; }
 @media (max-width: 480px) {
   .macro-row { grid-template-columns: repeat(2, 1fr); }
   .metrics { grid-template-columns: repeat(2, 1fr); }
+  .settings-grid { grid-template-columns: 1fr; }
   .wrap { padding: 16px 14px 40px; }
 }
 </style>
 </head>
 <body>
 <div class="wrap" id="app">
-  <div class="loading-msg" id="loading">Loading plan…</div>
+  <div class="loading-msg" id="loading">Connecting to Intervals.icu…</div>
 </div>
 
 <script>
-// ─── Config ───
-const PLAN_URL = 'data/plan.json';
+// ════════════════════════════════════════════════════════════════
+//  SETTINGS — localStorage persistence
+// ════════════════════════════════════════════════════════════════
+const DEFAULTS = {
+  ftp: 321,
+  weight: 81,
+  bmr: 1825,
+  neatMultiplier: 1.20,
+  deficitPerDay: 270,
+  proteinFloor: 160,
+  proteinLongDay: 165,
+};
 
-// ─── Helpers ───
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('fuelSettings'));
+    if (s) return { ...DEFAULTS, ...s };
+  } catch {}
+  return { ...DEFAULTS };
+}
+
+function saveSettings(s) {
+  localStorage.setItem('fuelSettings', JSON.stringify(s));
+}
+
+function getOffBikeBaseline(s) {
+  return Math.round(s.bmr * s.neatMultiplier);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════════
 function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+
 function todayISO() { return new Date().toISOString().slice(0, 10); }
+
 function formatDate(d) {
   const dt = new Date(d + 'T00:00:00');
   return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-function computePowerLine(day, meta) {
-  const p = day.power;
-  if (!p) return null;
-  const baseline = meta.offBikeBaseline;
-
-  if (p.source === 'actual') {
-    const rideKcal = p.rideKcal || Math.round(p.avgWatts * p.durationSec / 1000);
-    const tdee = baseline + rideKcal;
-    const eat = day.macros.kcal;
-    const deficit = tdee - eat;
-    return {
-      html: `TP actual: ${p.avgWatts ? fmt(p.avgWatts) + ' W avg × ' : ''}${fmt(p.durationSec)} s ÷ 1000 = <b>${fmt(rideKcal)} kcal ride</b> · TDEE ${fmt(tdee)} · Eat ${fmt(eat)} (~${fmt(deficit)} kcal deficit)`,
-      isActual: true
-    };
-  }
-
-  if (p.source === 'estimate') {
-    const avgW = Math.round(p.intensityFactor * meta.ftp);
-    const rideKcal = Math.round(avgW * p.durationSec / 1000);
-    const tdee = baseline + rideKcal;
-    const eat = p.targetEat || day.macros.kcal;
-    return {
-      html: `Estimate: ${p.intensityFactor} × ${meta.ftp} W = ${avgW} W × ${fmt(p.durationSec)} s ÷ 1000 = <b>${fmt(rideKcal)} kcal ride</b> · TDEE ${fmt(tdee)} · Eat ${fmt(eat)}`,
-      isActual: false
-    };
-  }
-  return null;
+function formatDateLong(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-// ─── Render ───
-function renderPlan(plan) {
-  const app = document.getElementById('app');
-  const today = todayISO();
-  const m = plan.meta;
+function dayName(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+}
 
-  // Compute weekly hours from session descriptions or sum durations
-  let totalHours = 0;
-  plan.days.forEach(d => {
-    if (d.power && d.power.durationSec) totalHours += d.power.durationSec / 3600;
+// Get Monday of the week containing a date
+function getMonday(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const mon = new Date(d);
+  mon.setDate(diff);
+  return mon.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function weekDates(monday) {
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+}
+
+// ════════════════════════════════════════════════════════════════
+//  NUTRITION ENGINE
+//  Grounded in: Burke 2011, Jeukendrup 2014, Thomas 2016 ACSM,
+//  Phillips & van Loon 2011, Sawka 2007, Stellingwerff/Impey
+// ════════════════════════════════════════════════════════════════
+
+// Classify session from event data
+function classifySession(events) {
+  if (!events || events.length === 0) return { type: 'rest', label: 'Rest', session: 'OFF — rest day', durationSec: 0, intensityFactor: 0 };
+
+  // Take the primary cycling event
+  const cycling = events.filter(e => {
+    const cat = (e.category || '').toUpperCase();
+    const type = (e.type || '').toUpperCase();
+    return cat === 'RIDE' || cat === 'CYCLING' || cat === 'VIRTUALRIDE'
+        || type === 'RIDE' || type === 'CYCLING' || type === 'VIRTUALRIDE';
   });
 
-  // Compute daily kcal avg
-  let totalKcal = 0;
-  plan.days.forEach(d => totalKcal += d.macros.kcal);
-  const avgKcal = Math.round(totalKcal / plan.days.length);
+  if (cycling.length === 0) {
+    // Check if it's a rest day note
+    return { type: 'rest', label: 'Rest', session: 'OFF — rest day', durationSec: 0, intensityFactor: 0 };
+  }
 
-  let html = `
+  // Sum durations if multiple rides
+  const totalDur = cycling.reduce((s, e) => s + (e.movingTime || 0), 0);
+  const hours = totalDur / 3600;
+  const name = cycling.map(e => e.name).join(' + ');
+  const nameLower = name.toLowerCase();
+
+  // Get IF from event if available
+  let intensityFactor = null;
+  for (const e of cycling) {
+    if (e.icu_intensity) { intensityFactor = e.icu_intensity; break; }
+  }
+
+  // Classify based on duration + name hints
+  let type, label;
+
+  if (hours >= 2.5) {
+    type = 'long';
+    label = hours >= 3.5 ? 'Long — big day' : 'Long';
+  } else if (hours >= 1.5 && (nameLower.includes('z2') || nameLower.includes('endurance') || nameLower.includes('long'))) {
+    type = 'long';
+    label = 'Long';
+  } else if (nameLower.includes('interval') || nameLower.includes('threshold') || nameLower.includes('vo2')
+          || nameLower.includes('ftp') || nameLower.includes('race') || nameLower.includes('tempo')
+          || nameLower.includes('sweet spot') || nameLower.includes('ss ')
+          || (intensityFactor && intensityFactor > 0.82)) {
+    type = 'hard';
+    label = 'Hard';
+  } else if (hours <= 1.0 || nameLower.includes('recovery') || nameLower.includes('easy')
+          || (intensityFactor && intensityFactor < 0.60)) {
+    type = 'easy';
+    label = 'Easy';
+  } else {
+    type = 'hard';
+    label = nameLower.includes('z2') ? 'Endurance' : 'Moderate';
+  }
+
+  // Default IF estimates if not provided by ICU
+  if (!intensityFactor) {
+    if (type === 'easy') intensityFactor = 0.55;
+    else if (type === 'long') intensityFactor = 0.65;
+    else intensityFactor = 0.78;
+  }
+
+  const session = name || `${label} ${hours.toFixed(1)} h`;
+
+  return { type, label, session, durationSec: totalDur, intensityFactor };
+}
+
+// Compute daily macros
+function computeDayMacros(rideKcal, durationSec, settings) {
+  const baseline = getOffBikeBaseline(settings);
+  const tdee = baseline + rideKcal;
+  const intake = tdee - settings.deficitPerDay;
+  const hours = durationSec / 3600;
+
+  const protein = hours >= 3.5 ? settings.proteinLongDay : settings.proteinFloor;
+  // Fat: ~20-22% of intake on ride days, ~25% on rest
+  const fatPct = rideKcal > 0 ? 0.21 : 0.25;
+  const fatKcal = intake * fatPct;
+  const fat = Math.round(fatKcal / 9 / 5) * 5; // round to nearest 5
+
+  const proteinKcal = protein * 4;
+  const carbKcal = Math.max(0, intake - proteinKcal - fat * 9);
+  const carbs = Math.round(carbKcal / 4 / 5) * 5; // round to nearest 5
+
+  // Recalculate actual intake from rounded values
+  const actualIntake = Math.round(carbs * 4 + protein * 4 + fat * 9);
+
+  return { kcal: actualIntake, carbs, protein, fat, tdee, intake: Math.round(intake) };
+}
+
+// ────────────────────────────────────────────────────────────────
+//  FUEL PROTOCOLS — Jeukendrup 2014 decision tree + Burke 2011
+//  + Thomas 2016 ACSM + Sawka 2007 hydration
+// ────────────────────────────────────────────────────────────────
+
+function generatePreFuel(durationSec, weight) {
+  const hours = durationSec / 3600;
+  if (hours < 0.75) return null; // No pre-fuel needed for very short sessions
+
+  let carbGkg, timing;
+  if (hours < 1.5) {
+    carbGkg = 1.0; timing = '1–2 h before';
+  } else if (hours < 2.5) {
+    carbGkg = 1.5; timing = '2–3 h before';
+  } else if (hours < 3.5) {
+    carbGkg = 2.0; timing = '2–3 h before';
+  } else {
+    carbGkg = 2.5; timing = '2–3 h before';
+  }
+
+  const carbs = Math.round(carbGkg * weight);
+  const protein = Math.round(0.3 * weight); // 0.3 g/kg per Phillips & van Loon
+  const fat = hours >= 2 ? 10 : 5; // minimal fat, low fiber
+
+  return {
+    carbs, protein, fat,
+    timing,
+    notes: hours >= 2
+      ? 'Low fat, low fibre, moderate protein. E.g. oats + banana + honey + Greek yogurt + eggs.'
+      : 'Light, carb-focused. E.g. toast + honey + banana, or oats + fruit.',
+    carbGkg: carbGkg.toFixed(1)
+  };
+}
+
+function generateIntraFuel(durationSec, weight) {
+  const hours = durationSec / 3600;
+
+  if (hours < 0.75) {
+    return { rate: 0, total: 0, type: 'none', detail: 'No fueling needed — glycogen sufficient.', sodium: 0, fluid: 0 };
+  }
+  if (hours < 1.25) {
+    return { rate: 0, total: 0, type: 'mouth-rinse', detail: 'Mouth rinse only (4–6% CHO solution, swirl 5–10 s). Central ergogenic effect without GI load.', sodium: 0, fluid: '400–600' };
+  }
+
+  let rate, choType, sodium, fluid;
+
+  if (hours < 2) {
+    rate = 30;
+    choType = 'Single-source CHO OK (glucose, maltodextrin, sucrose).';
+    sodium = '300–500';
+    fluid = '400–750';
+  } else if (hours < 2.5) {
+    rate = 60;
+    choType = 'Single-source CHO OK. Consider multi-transportable if gut tolerates.';
+    sodium = '500–700';
+    fluid = '500–750';
+  } else if (hours < 3.5) {
+    rate = 80;
+    choType = 'Multi-transportable CHO required (2:1 glu:fru). Single-source saturates SGLT1 at ~60 g/h.';
+    sodium = '500–700';
+    fluid = '600–800';
+  } else {
+    rate = 90;
+    choType = 'Multi-transportable CHO required (2:1 glu:fru). Gut-trained athletes: push toward 100–120 g/h.';
+    sodium = '600–800';
+    fluid = '≥750';
+  }
+
+  // Effective fueling time: start from min 20-30, end ~15 min before finish
+  const fuelingHours = Math.max(0, hours - 0.5);
+  const total = Math.round(rate * fuelingHours);
+
+  return {
+    rate, total, type: choType,
+    detail: `Start fueling from min 20–30. Eat every 20–30 min — stay ahead.`,
+    sodium: `${sodium} mg/L`,
+    fluid: `${fluid} ml/h`
+  };
+}
+
+function generatePostFuel(durationSec, weight, intensityFactor) {
+  const hours = durationSec / 3600;
+  if (hours < 0.75) return null;
+
+  const protein = Math.round(0.3 * weight); // 0.3 g/kg per Phillips & van Loon
+  let carbGkg;
+  if (hours < 1.5) carbGkg = 0.8;
+  else if (hours < 2.5) carbGkg = 1.0;
+  else carbGkg = 1.2;
+
+  // Higher IF = more glycogen depletion = more aggressive refuel
+  if (intensityFactor > 0.80) carbGkg = Math.min(1.2, carbGkg + 0.1);
+
+  const carbs = Math.round(carbGkg * weight);
+
+  return {
+    carbs, protein,
+    timing: 'Within 30–60 min',
+    carbGkg: carbGkg.toFixed(1),
+    notes: hours >= 2.5
+      ? 'Glycogen heavily depleted. Refuel aggressively even if appetite is suppressed. Liquid first if needed (chocolate milk, smoothie), real meal within 90 min.'
+      : 'Recovery shake or meal. E.g. chocolate milk + whey + banana + dried fruit.',
+  };
+}
+
+// Preload advice for tomorrow
+function generatePreload(tomorrowClassified, dayOfWeek) {
+  if (!tomorrowClassified || tomorrowClassified.type === 'rest') return null;
+
+  const hours = tomorrowClassified.durationSec / 3600;
+  const items = [];
+
+  if (tomorrowClassified.type === 'long' || hours >= 2.5) {
+    items.push('Dinner should be carb-forward, low fibre, moderate protein, low fat. No creamy pasta, fried food, or high-fibre legume bowls.');
+    if (hours >= 3.5) {
+      items.push('If craving 2nd dinner / late snack: white rice + honey, sourdough + jam, or banana + cereal. Aim for an extra 60–80 g carb.');
+    }
+    items.push('Salt dinner generously if tomorrow is long or hot — want sodium status high before you start.');
+    items.push('Prep bottles + bars + breakfast before bed. Lights out early.');
+  } else if (tomorrowClassified.type === 'hard') {
+    items.push('Dinner carb-forward to top up glycogen. Don\'t add extra fat or fibre late.');
+    items.push('If hungry before bed: carbs > protein at this point (honey, toast, banana).');
+  } else {
+    items.push('Normal dinner. Hydrate to pale urine before bed.');
+  }
+
+  const label = `Tomorrow preload · ${dayOfWeek} = ${tomorrowClassified.session}`;
+  return { label, items };
+}
+
+// ════════════════════════════════════════════════════════════════
+//  DATA FETCHING
+// ════════════════════════════════════════════════════════════════
+let currentMonday = getMonday(todayISO());
+let cachedData = {};
+
+async function fetchWeekData(monday) {
+  const sunday = addDays(monday, 6);
+  const key = monday;
+
+  if (cachedData[key]) return cachedData[key];
+
+  const resp = await fetch(`/api/intervals?oldest=${monday}&newest=${sunday}`);
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${resp.status}`);
+  }
+  const data = await resp.json();
+  cachedData[key] = data;
+  return data;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════════════════════
+
+let activeView = 'plan'; // 'plan' or 'settings'
+
+function renderApp() {
+  if (activeView === 'settings') {
+    renderSettings();
+  } else {
+    loadAndRenderPlan();
+  }
+}
+
+async function loadAndRenderPlan() {
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="loading-msg">Loading from Intervals.icu…</div>';
+
+  try {
+    const data = await fetchWeekData(currentMonday);
+    renderPlan(data);
+  } catch (e) {
+    app.innerHTML = `
+      ${renderHeader()}
+      <div class="error-msg"><b>Could not load data from Intervals.icu.</b><br>${e.message}<br><br>Check your API key in Vercel environment variables.</div>
+    `;
+  }
+}
+
+function renderHeader() {
+  return `
     <header>
-      <h1>Weekly fueling plan</h1>
-      <p class="subtle">${m.weekLabel} · ${m.phase} · ${m.version}${m.notes ? ' · ' + m.notes : ''}</p>
+      <h1>Fuel Plan</h1>
+      <p class="subtle">Auto-generated from Intervals.icu · powered by research</p>
+      <div class="nav-bar">
+        <button class="nav-btn ${activeView === 'plan' ? 'active' : ''}" onclick="switchView('plan')">Plan</button>
+        <button class="nav-btn ${activeView === 'settings' ? 'active' : ''}" onclick="switchView('settings')">Settings</button>
+      </div>
+    </header>`;
+}
 
-      <div class="metrics">
-        <div class="metric"><p class="lbl">FTP</p><p class="val">${m.ftp}<span class="unit"> W</span></p></div>
-        <div class="metric"><p class="lbl">Daily kcal avg</p><p class="val">${fmt(avgKcal)}<span class="unit"> kcal</span></p></div>
-        <div class="metric"><p class="lbl">Protein floor</p><p class="val">${m.proteinFloor}<span class="unit"> g/day</span></p></div>
-        <div class="metric"><p class="lbl">Working weight</p><p class="val">${m.weight}<span class="unit"> kg</span></p></div>
-        <div class="metric"><p class="lbl">Cycling load</p><p class="val">${totalHours.toFixed(1)}<span class="unit"> hr</span></p></div>
-        <div class="metric"><p class="lbl">Off-bike baseline</p><p class="val">${fmt(m.offBikeBaseline)}<span class="unit"> kcal</span></p></div>
-      </div>`;
+function renderPlan(data) {
+  const app = document.getElementById('app');
+  const settings = loadSettings();
+  const baseline = getOffBikeBaseline(settings);
+  const today = todayISO();
+  const dates = weekDates(currentMonday);
+  const sunday = dates[6];
 
-  // Intervals.icu refresh bar
+  // Build day objects
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const date = dates[i];
+    const evts = data.events ? data.events[date] : null;
+    const acts = data.activities ? data.activities[date] : null;
+    const hasActual = acts && acts.totalEnergy > 0;
+
+    const classified = classifySession(evts ? evts : []);
+
+    // Determine power source
+    let rideKcal, avgWatts, durationSec, source;
+    if (hasActual) {
+      rideKcal = acts.totalEnergy;
+      avgWatts = acts.avgWatts;
+      durationSec = acts.totalTime;
+      source = 'actual';
+    } else if (classified.durationSec > 0) {
+      durationSec = classified.durationSec;
+      avgWatts = Math.round(classified.intensityFactor * settings.ftp);
+      rideKcal = Math.round(avgWatts * durationSec / 1000);
+      source = 'estimate';
+
+      // If event has joules, use that instead
+      if (evts) {
+        const totalJoules = evts.reduce((s, e) => s + (e.joules || 0), 0);
+        if (totalJoules > 0) {
+          rideKcal = Math.round(totalJoules / 1000);
+          source = 'planned';
+        }
+      }
+    } else {
+      rideKcal = 0; avgWatts = 0; durationSec = 0; source = 'none';
+    }
+
+    const macros = computeDayMacros(rideKcal, durationSec, settings);
+
+    days.push({
+      date, classified, rideKcal, avgWatts, durationSec, source, macros,
+      hasActual, evts, acts
+    });
+  }
+
+  // ── Header + Metrics ──
+  let totalHours = days.reduce((s, d) => s + d.durationSec / 3600, 0);
+  let totalKcal = days.reduce((s, d) => s + d.macros.kcal, 0);
+  let avgKcal = Math.round(totalKcal / 7);
+
+  let html = renderHeader();
+
+  // Week navigation
+  const thisMonday = getMonday(todayISO());
   html += `
-    <div class="refresh-bar">
-      <button class="refresh-btn" id="icu-btn" onclick="refreshFromIntervals()" type="button"><span class="icon">↻</span> Refresh from Intervals.icu</button>
-      <span class="refresh-status" id="icu-status">Click to pull latest ride data from Intervals.icu.</span>
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)">‹</button>
+      <span class="week-label">${formatDateLong(currentMonday)} — ${formatDateLong(sunday)}${currentMonday === thisMonday ? ' · this week' : ''}</span>
+      <button onclick="changeWeek(1)">›</button>
+    </div>`;
+
+  html += `
+    <div class="metrics">
+      <div class="metric"><p class="lbl">FTP</p><p class="val">${settings.ftp}<span class="unit"> W</span></p></div>
+      <div class="metric"><p class="lbl">Daily kcal avg</p><p class="val">${fmt(avgKcal)}<span class="unit"> kcal</span></p></div>
+      <div class="metric"><p class="lbl">Protein floor</p><p class="val">${settings.proteinFloor}<span class="unit"> g/day</span></p></div>
+      <div class="metric"><p class="lbl">Working weight</p><p class="val">${settings.weight}<span class="unit"> kg</span></p></div>
+      <div class="metric"><p class="lbl">Cycling load</p><p class="val">${totalHours.toFixed(1)}<span class="unit"> hr</span></p></div>
+      <div class="metric"><p class="lbl">Off-bike baseline</p><p class="val">${fmt(baseline)}<span class="unit"> kcal</span></p></div>
     </div>`;
 
   // Calibration
   html += `
-      <div class="calib">
-        <b>Power-based costing.</b> Each ride is individually costed: <code>ride_kcal ≈ avg_power_W × duration_s ÷ 1000</code>. Uses <em>average</em> power (not normalized). When actual data arrives from Intervals.icu, macros are recalculated: TDEE updates, same ~${m.deficitPerDay} kcal deficit is maintained, and the difference is pulled from <b>carbs only</b> — protein floor (${m.proteinFloor}g) and fat stay fixed.
-      </div>`;
+    <div class="calib">
+      <b>Auto-generated from Intervals.icu.</b> Each ride is costed: <code>ride_kcal ≈ avg_power × duration_s ÷ 1000</code>.
+      Completed rides use actual data; upcoming rides use planned workouts. Deficit target: ~${settings.deficitPerDay} kcal/day.
+      Carbs are the adjustment lever — protein (${settings.proteinFloor}g) and fat stay fixed.
+      Fuel protocols follow Jeukendrup 2014 / Burke 2011 / Thomas 2016 ACSM.
+    </div>`;
 
-  // Changelog
-  if (plan.changelog && plan.changelog.length) {
-    html += `<div class="changed"><b>What changed</b><ul>`;
-    plan.changelog.forEach(c => html += `<li>${c}</li>`);
-    html += `</ul></div>`;
-  }
+  // Refresh bar
+  html += `
+    <div class="refresh-bar">
+      <button class="refresh-btn" id="icu-btn" onclick="refreshData()" type="button"><span class="icon">↻</span> Refresh</button>
+      <span class="refresh-status" id="icu-status">Data auto-loaded from Intervals.icu.</span>
+    </div>`;
 
   // Install prompt
-  html += `<div class="install-bar" id="install-bar" onclick="installPWA()">Install this app on your home screen</div>`;
+  html += `<div class="install-bar" id="install-bar" onclick="installPWA()">Install on home screen</div>`;
 
-  html += `</header><h2>Day-by-day</h2>`;
+  html += `<h2>Day-by-day</h2>`;
 
-  // Day cards
-  plan.days.forEach(day => {
-    const isPast = day.date < today || day.status === 'done';
+  // ── Day cards ──
+  days.forEach((day, idx) => {
+    const isPast = day.date < today;
     const isToday = day.date === today;
+    const c = day.classified;
+    const hours = day.durationSec / 3600;
+
     let classes = 'day';
     if (isPast) classes += ' past';
     if (isToday) classes += ' today';
 
-    const badgeType = day.type; // rest, easy, hard
-    const badgeLabel = day.sessionLabel || day.type.charAt(0).toUpperCase() + day.type.slice(1);
-
     html += `<article class="${classes}" data-date="${day.date}">`;
+
+    // Head
     html += `<div class="day-head">`;
-    html += `<span class="day-name">${day.name}</span>`;
+    html += `<span class="day-name">${dayName(day.date)}</span>`;
     html += `<span class="day-date">${formatDate(day.date)}</span>`;
-    html += `<span class="badge ${badgeType}">${badgeLabel}</span>`;
+    html += `<span class="badge ${c.type}">${c.label}</span>`;
     if (isToday) html += `<span class="pill today-pill">TODAY</span>`;
-    if (isPast && !isToday) html += `<span class="pill past-pill">DONE</span>`;
-    if (day.recalibrated) html += `<span class="pill recal-pill">RECALIBRATED</span>`;
+    if (day.hasActual) html += `<span class="pill actual-pill">✓ actual</span>`;
     html += `</div>`;
 
-    html += `<p class="session">${day.session}</p>`;
+    // Session
+    html += `<p class="session">${c.session}${hours > 0 ? ` · ${hours.toFixed(1)} h` : ''}</p>`;
 
     // Power line
-    const pl = computePowerLine(day, m);
-    if (pl) {
-      html += `<p class="power-line${pl.isActual ? ' actual' : ''}">${pl.html}</p>`;
+    if (day.rideKcal > 0) {
+      const deficit = day.macros.tdee - day.macros.kcal;
+      const isActual = day.source === 'actual';
+      const sourceLabel = isActual ? 'Intervals.icu' : (day.source === 'planned' ? 'Planned' : 'Estimate');
+      let powerText = `${sourceLabel}: `;
+      if (day.avgWatts) powerText += `${day.avgWatts} W avg × ${fmt(day.durationSec)} s ÷ 1000 = `;
+      powerText += `<b>${fmt(day.rideKcal)} kcal ride</b> · TDEE ${fmt(day.macros.tdee)} · Eat ${fmt(day.macros.kcal)} (~${fmt(deficit)} kcal deficit)`;
+      html += `<p class="power-line${isActual ? ' actual' : ''}">${powerText}</p>`;
     }
 
     // Macros
@@ -329,55 +739,61 @@ function renderPlan(plan) {
     html += `<div class="macro"><p class="m-lbl">Fat</p><p class="m-val">${fmt(mc.fat)}<span class="m-unit"> g</span></p></div>`;
     html += `</div>`;
 
-    // Note
-    if (day.note) {
-      html += `<div class="note"><b>${day.note.split(':')[0]}:</b>${day.note.split(':').slice(1).join(':')}</div>`;
-    }
+    // ── Fuel protocols (only for ride days) ──
+    if (hours >= 0.75) {
+      // PRE-WORKOUT
+      const pre = generatePreFuel(day.durationSec, settings.weight);
+      if (pre) {
+        html += `<div class="fuel-block pre">`;
+        html += `<p class="fuel-label">Pre-workout · ${pre.timing}</p>`;
+        html += `<p class="fuel-macro">${pre.carbs} g C · ${pre.protein} g P · ${pre.fat} g F</p>`;
+        html += `<p class="fuel-detail">${pre.carbGkg} g/kg carbs. ${pre.notes}</p>`;
+        html += `</div>`;
+      }
 
-    // Fuel
-    if (day.fuel) {
-      html += `<div class="fuel"><p class="fuel-title">${day.fuel.title}</p>`;
-      day.fuel.rows.forEach(r => {
-        html += `<p class="fuel-row"><b>${r.label}:</b> ${r.text}</p>`;
-      });
+      // INTRA-WORKOUT
+      const intra = generateIntraFuel(day.durationSec, settings.weight);
+      html += `<div class="fuel-block intra">`;
+      html += `<p class="fuel-label">During workout${intra.rate > 0 ? ' · ' + intra.rate + ' g/h target' : ''}</p>`;
+      if (intra.total > 0) {
+        html += `<p class="fuel-macro">~${intra.total} g CHO total · ${intra.sodium} sodium · ${intra.fluid} fluid</p>`;
+      }
+      html += `<p class="fuel-detail">${intra.type}</p>`;
+      html += `<p class="fuel-detail">${intra.detail}</p>`;
       html += `</div>`;
+
+      // POST-WORKOUT
+      const post = generatePostFuel(day.durationSec, settings.weight, day.classified.intensityFactor);
+      if (post) {
+        html += `<div class="fuel-block post">`;
+        html += `<p class="fuel-label">Post-workout · ${post.timing}</p>`;
+        html += `<p class="fuel-macro">${post.carbs} g C (${post.carbGkg} g/kg) · ${post.protein} g P (0.3 g/kg)</p>`;
+        html += `<p class="fuel-detail">${post.notes}</p>`;
+        html += `</div>`;
+      }
     }
 
-    // Meals
-    if (day.meals) {
-      html += `<div class="meals"><p class="lead">${day.meals.label}</p><ul>`;
-      day.meals.items.forEach(item => {
-        // Bold the first word/phrase before ':'
-        const colonIdx = item.indexOf(':');
-        if (colonIdx > 0) {
-          html += `<li><b>${item.substring(0, colonIdx)}:</b>${item.substring(colonIdx + 1)}</li>`;
-        } else {
-          html += `<li>${item}</li>`;
-        }
-      });
-      html += `</ul></div>`;
-    }
-
-    // Preload
-    if (day.preload) {
-      html += `<div class="preload"><p class="preload-title">${day.preload.label}</p><ul>`;
-      day.preload.items.forEach(item => {
-        html += `<li>${item}</li>`;
-      });
-      html += `</ul></div>`;
+    // ── Preload advice ──
+    const nextDay = idx < 6 ? days[idx + 1] : null;
+    if (nextDay) {
+      const nextDayName = dayName(nextDay.date);
+      const preload = generatePreload(nextDay.classified, nextDayName);
+      if (preload) {
+        html += `<div class="preload"><p class="preload-title">${preload.label}</p><ul>`;
+        preload.items.forEach(item => html += `<li>${item}</li>`);
+        html += `</ul></div>`;
+      }
     }
 
     html += `</article>`;
   });
 
   // Footer
-  if (plan.troubleshooting && plan.troubleshooting.length) {
-    html += `<div class="foot"><p style="margin:0 0 6px"><b>If something feels off this week:</b></p><ul>`;
-    plan.troubleshooting.forEach(t => html += `<li>${t}</li>`);
-    html += `</ul>`;
-    html += `<p style="margin:12px 0 0"><span class="subtle">To update this plan: edit <code>data/plan.json</code> and push to GitHub — Vercel auto-deploys in seconds. Ride data refreshes from Intervals.icu.</span></p>`;
-    html += `</div>`;
-  }
+  html += `
+    <div class="foot">
+      <p style="margin:0"><b>Troubleshooting:</b> Dragging mid-week → add 200 kcal/day (carbs). Weight stalling → pull rest-day carbs by 50g.
+      Tracking weighs on mood → simplify to protein + ride fuel only. Sick → pause deficit, eat maintenance.</p>
+    </div>`;
 
   app.innerHTML = html;
 
@@ -388,178 +804,127 @@ function renderPlan(plan) {
   }
 }
 
-// ─── Load plan ───
-async function loadPlan() {
-  try {
-    const resp = await fetch(PLAN_URL + '?t=' + Date.now());
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const plan = await resp.json();
-    window._plan = plan;
-    renderPlan(plan);
-  } catch (e) {
-    document.getElementById('app').innerHTML =
-      `<div class="error-msg"><b>Could not load plan.</b><br>${e.message}<br><br>Make sure <code>data/plan.json</code> exists.</div>`;
-  }
+// ════════════════════════════════════════════════════════════════
+//  SETTINGS VIEW
+// ════════════════════════════════════════════════════════════════
+
+function renderSettings() {
+  const app = document.getElementById('app');
+  const s = loadSettings();
+  const baseline = getOffBikeBaseline(s);
+
+  let html = renderHeader();
+
+  html += `<h2>Settings</h2>`;
+  html += `<p class="subtle">These values drive all macro and fuel calculations. Stored in your browser.</p>`;
+
+  html += `
+    <div class="settings-grid">
+      <div class="setting-field">
+        <label>FTP (W)</label>
+        <input type="number" id="s-ftp" value="${s.ftp}" step="1">
+        <span class="hint">Functional threshold power</span>
+      </div>
+      <div class="setting-field">
+        <label>Weight (kg)</label>
+        <input type="number" id="s-weight" value="${s.weight}" step="0.5">
+        <span class="hint">Working bodyweight</span>
+      </div>
+      <div class="setting-field">
+        <label>BMR (kcal/day)</label>
+        <input type="number" id="s-bmr" value="${s.bmr}" step="5">
+        <span class="hint">Basal metabolic rate</span>
+      </div>
+      <div class="setting-field">
+        <label>NEAT multiplier</label>
+        <input type="number" id="s-neat" value="${s.neatMultiplier}" step="0.05" min="1.0" max="1.6">
+        <span class="hint">Off-bike activity factor (1.10–1.40)</span>
+      </div>
+      <div class="setting-field">
+        <label>Daily deficit (kcal)</label>
+        <input type="number" id="s-deficit" value="${s.deficitPerDay}" step="10">
+        <span class="hint">Target daily deficit. 270 ≈ 0.25 kg/wk</span>
+      </div>
+      <div class="setting-field">
+        <label>Protein floor (g/day)</label>
+        <input type="number" id="s-protein" value="${s.proteinFloor}" step="5">
+        <span class="hint">Min daily protein (~2 g/kg during deficit)</span>
+      </div>
+      <div class="setting-field">
+        <label>Protein long day (g)</label>
+        <input type="number" id="s-proteinLong" value="${s.proteinLongDay}" step="5">
+        <span class="hint">Protein on 3.5h+ ride days</span>
+      </div>
+    </div>`;
+
+  html += `
+    <div class="derived">
+      <b>Derived values:</b><br>
+      Off-bike baseline = BMR × NEAT = ${fmt(s.bmr)} × ${s.neatMultiplier} = <b>${fmt(baseline)} kcal/day</b><br>
+      TDEE on ride days = ${fmt(baseline)} + ride_kcal<br>
+      Protein per kg = ${(s.proteinFloor / s.weight).toFixed(2)} g/kg/d
+    </div>`;
+
+  html += `
+    <div class="settings-actions">
+      <button class="btn-save" onclick="saveSettingsFromForm()">Save</button>
+      <button class="btn-reset" onclick="resetSettings()">Reset to defaults</button>
+    </div>`;
+
+  html += `
+    <div class="calib" style="margin-top: 20px;">
+      <b>Research basis:</b> TDEE formula follows power-based costing (kJ ≈ kcal at ~22–25% gross efficiency).
+      Protein per Phillips & van Loon 2011: 1.2–2.0 g/kg/d, 0.3 g/kg per meal, 4–5 meals/day.
+      Carb periodization per Burke 2011 / Stellingwerff: fuel for the work required.
+      Deficit of ~270 kcal/day targets ~0.25 kg/week fat loss while preserving lean mass.
+    </div>`;
+
+  app.innerHTML = html;
 }
 
-// ─── Macro recalculation ───
-// When actual ride kcal differs from estimate, recalculate intake.
-// Logic (grounded in periodized nutrition research — Stellingwerff, Burke, Jeukendrup):
-//   - Protein stays at floor (structural, non-negotiable)
-//   - Fat stays stable (hormonal health, satiety)
-//   - Carbs are the adjustment lever
-//   - Same deficit target is maintained
-function recalcMacros(originalMacros, originalRideKcal, actualRideKcal, meta) {
-  const baseline = meta.offBikeBaseline;
-  const deficit = meta.deficitPerDay || 270;
-  const protein = originalMacros.protein; // stays fixed
-  const fat = originalMacros.fat;         // stays fixed
-
-  // New TDEE from actual ride data
-  const newTdee = baseline + actualRideKcal;
-  const newEat = newTdee - deficit;
-
-  // Calories from protein + fat are fixed
-  const proteinKcal = protein * 4;
-  const fatKcal = fat * 9;
-  const carbKcal = Math.max(0, newEat - proteinKcal - fatKcal);
-  const carbs = Math.round(carbKcal / 4);
-
-  return {
-    kcal: Math.round(newEat),
-    carbs: carbs,
-    protein: protein,
-    fat: fat
+function saveSettingsFromForm() {
+  const s = {
+    ftp: parseInt(document.getElementById('s-ftp').value) || DEFAULTS.ftp,
+    weight: parseFloat(document.getElementById('s-weight').value) || DEFAULTS.weight,
+    bmr: parseInt(document.getElementById('s-bmr').value) || DEFAULTS.bmr,
+    neatMultiplier: parseFloat(document.getElementById('s-neat').value) || DEFAULTS.neatMultiplier,
+    deficitPerDay: parseInt(document.getElementById('s-deficit').value) || DEFAULTS.deficitPerDay,
+    proteinFloor: parseInt(document.getElementById('s-protein').value) || DEFAULTS.proteinFloor,
+    proteinLongDay: parseInt(document.getElementById('s-proteinLong').value) || DEFAULTS.proteinLongDay,
   };
+  saveSettings(s);
+  cachedData = {}; // Clear cache to recalculate
+  switchView('plan');
 }
 
-// ─── Intervals.icu Integration ───
-async function refreshFromIntervals() {
-  const btn = document.getElementById('icu-btn');
-  const status = document.getElementById('icu-status');
-  if (!btn) return;
-  btn.disabled = true;
-  btn.classList.add('loading');
-  status.textContent = 'Fetching rides from Intervals.icu…';
-  status.classList.remove('success', 'error');
-
-  try {
-    const plan = window._plan;
-    if (!plan || !plan.days || !plan.days.length) throw new Error('No plan loaded.');
-
-    const dates = plan.days.map(d => d.date).sort();
-    const oldest = dates[0];
-    const newest = dates[dates.length - 1];
-
-    const resp = await fetch(`/api/intervals?oldest=${oldest}&newest=${newest}`);
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${resp.status}`);
-    }
-    const byDate = await resp.json();
-
-    let updated = 0;
-    const meta = plan.meta;
-    const baseline = meta.offBikeBaseline;
-
-    document.querySelectorAll('.day[data-date]').forEach(card => {
-      const date = card.dataset.date;
-      const data = byDate[date];
-      if (!data || !data.totalEnergy) return;
-
-      const dayData = plan.days.find(d => d.date === date);
-      if (!dayData) return;
-
-      const actualRideKcal = data.totalEnergy;
-      const actualTdee = baseline + actualRideKcal;
-
-      // Compute what the original estimated ride kcal was
-      let originalRideKcal = 0;
-      if (dayData.power) {
-        if (dayData.power.source === 'estimate' && dayData.power.intensityFactor) {
-          const estW = Math.round(dayData.power.intensityFactor * meta.ftp);
-          originalRideKcal = Math.round(estW * dayData.power.durationSec / 1000);
-        } else if (dayData.power.rideKcal) {
-          originalRideKcal = dayData.power.rideKcal;
-        }
-      }
-
-      // Recalculate macros
-      const newMacros = recalcMacros(dayData.macros, originalRideKcal, actualRideKcal, meta);
-      const kcalDiff = newMacros.kcal - dayData.macros.kcal;
-      const carbDiff = newMacros.carbs - dayData.macros.carbs;
-
-      // Update power line
-      const pl = card.querySelector('.power-line');
-      if (pl) {
-        let line = `Intervals.icu: ${data.avgWatts ? fmt(data.avgWatts) + ' W avg × ' : ''}${fmt(data.totalTime)} s ÷ 1000 = <b>${fmt(actualRideKcal)} kcal ride</b> · TDEE ${fmt(actualTdee)} · Eat ${fmt(newMacros.kcal)} (~${fmt(meta.deficitPerDay || 270)} kcal deficit)`;
-        pl.innerHTML = line;
-        pl.classList.add('actual');
-      }
-
-      // Update macro cards
-      const macroCards = card.querySelectorAll('.macro');
-      if (macroCards.length >= 4) {
-        macroCards[0].querySelector('.m-val').textContent = fmt(newMacros.kcal);
-        const carbVal = macroCards[1].querySelector('.m-val');
-        carbVal.innerHTML = `${fmt(newMacros.carbs)}<span class="m-unit"> g</span>`;
-        // Highlight carb change if significant
-        if (Math.abs(carbDiff) >= 10) {
-          carbVal.style.color = carbDiff < 0 ? 'var(--hard-text)' : 'var(--success-text)';
-        }
-        macroCards[2].querySelector('.m-val').innerHTML = `${fmt(newMacros.protein)}<span class="m-unit"> g</span>`;
-        macroCards[3].querySelector('.m-val').innerHTML = `${fmt(newMacros.fat)}<span class="m-unit"> g</span>`;
-      }
-
-      // Add adjustment note if meaningful change
-      if (Math.abs(kcalDiff) >= 50) {
-        const existingAdj = card.querySelector('.adj-note');
-        if (!existingAdj) {
-          const note = document.createElement('div');
-          note.className = 'note adj-note';
-          note.innerHTML = `<b>Adjusted from actual:</b> ride was ${fmt(actualRideKcal)} kcal vs ${fmt(originalRideKcal)} kcal estimated (${kcalDiff > 0 ? '+' : ''}${fmt(kcalDiff)} kcal). Carbs ${carbDiff > 0 ? '+' : ''}${fmt(carbDiff)}g, protein and fat unchanged.`;
-          // Insert after macro row
-          const macroRow = card.querySelector('.macro-row');
-          if (macroRow && macroRow.nextSibling) {
-            macroRow.parentNode.insertBefore(note, macroRow.nextSibling);
-          } else {
-            card.appendChild(note);
-          }
-        }
-      }
-
-      // Add actual pill
-      const head = card.querySelector('.day-head');
-      if (head && !card.querySelector('.actual-pill')) {
-        const pill = document.createElement('span');
-        pill.className = 'pill actual-pill';
-        pill.textContent = '✓ actual';
-        head.appendChild(pill);
-      }
-      card.classList.add('refreshed');
-      updated++;
-    });
-
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    if (updated > 0) {
-      status.textContent = `Updated ${hh}:${mm} · ${updated} day${updated === 1 ? '' : 's'} patched from Intervals.icu. Macros recalculated.`;
-      status.classList.add('success');
-    } else {
-      status.textContent = `Refreshed ${hh}:${mm} · no matching rides found for this week.`;
-      status.classList.add('success');
-    }
-  } catch (e) {
-    status.textContent = e.message;
-    status.classList.add('error');
-  } finally {
-    btn.disabled = false;
-    btn.classList.remove('loading');
-  }
+function resetSettings() {
+  localStorage.removeItem('fuelSettings');
+  renderSettings();
 }
 
-// ─── PWA Install ───
+// ════════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════════════════
+
+function switchView(view) {
+  activeView = view;
+  renderApp();
+}
+
+function changeWeek(delta) {
+  currentMonday = addDays(currentMonday, delta * 7);
+  loadAndRenderPlan();
+}
+
+function refreshData() {
+  const key = currentMonday;
+  delete cachedData[key]; // Force re-fetch
+  loadAndRenderPlan();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  PWA Install
+// ════════════════════════════════════════════════════════════════
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -578,13 +943,10 @@ function installPWA() {
   });
 }
 
-// ─── Service Worker ───
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
-
-// ─── Boot ───
-loadPlan();
+// ════════════════════════════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════════════════════════════
+renderApp();
 </script>
 </body>
 </html>
